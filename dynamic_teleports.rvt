@@ -1,0 +1,61 @@
+declare global.object[0] with network priority local
+alias current_aim_target = global.object[0] -- The object that is currently aimed by the player.
+
+declare global.object[1]
+alias monitor_object = global.object[1] -- Monitor that it's attached to the attachable objects.
+
+declare global.number[0] with network priority local = 0
+alias is_player_attached = global.number[0] -- Flag: Determines if the player is attached (Zero for no, One for yes)
+
+declare global.number[1]
+alias monitor_shields_health = global.number[1]
+
+function initialize_new_attachable()
+    monitor_object = current_object.place_at_me(monitor, "monitor_obj", never_garbage_collect, 0, 0, 0, default)
+    current_object.object[0] = monitor_object -- Save the monitor, inside the current object.
+end
+
+function handle_attachables()
+    for each object with label "attachable_obj" do
+        if current_object.object[0] == no_object then -- If the monitor doesn't exists on this object.
+            initialize_new_attachable()
+        end
+    end
+end 
+
+function attach_player()
+    send_incident(teleporter_used, current_player, all_players)
+    current_player.biped.attach_to(current_aim_target, 0, 0, 0, relative) -- Attach player to the specified object.
+    current_aim_target.delete() -- Delete the monitor.
+    is_player_attached = 1
+end
+
+function detach_player()
+    current_player.biped.detach() -- Execute detach
+    is_player_attached = 0
+end
+
+function handle_player_attachements()
+    for each player do
+        if current_player.biped != no_object then
+            current_aim_target = current_player.get_crosshair_target() -- Get the object the player is aiming at.
+
+            if current_aim_target.has_forge_label("monitor_obj") then -- If the object has the specified label.
+                monitor_shields_health = current_aim_target.shields -- Get the shields health.
+
+                if monitor_shields_health < 80 then
+                    attach_player()
+                end
+            end
+
+            if is_player_attached == 1 then
+                detach_player()
+            end
+        end
+    end
+end
+
+do -- kinda start method
+    handle_attachables()
+    handle_player_attachements()
+end
