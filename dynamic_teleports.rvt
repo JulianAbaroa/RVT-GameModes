@@ -1,61 +1,82 @@
-declare global.object[0] with network priority local
-alias current_aim_target = global.object[0] -- The object that is currently aimed by the player.
-
 declare global.object[1]
-alias monitor_object = global.object[1] -- Monitor that it's attached to the attachable objects.
+alias object_to_attach = global.object[1] -- Placeholder object used to "teleport" the player to it's position.
 
-declare global.number[0] with network priority local = 0
-alias is_player_attached = global.number[0] -- Flag: Determines if the player is attached (Zero for no, One for yes)
+-- Summary:
+-- Makes sure every "teleporter_spawnpoint" object has its respective "teleporter" object.
+function handle_teleporters_spawnpoint()
+    alias teleporter = allocate global.object -- Monitor that it's attached to the attachable objects.
 
-declare global.number[1]
-alias monitor_shields_health = global.number[1]
-
-function initialize_new_attachable()
-    monitor_object = current_object.place_at_me(monitor, "monitor_obj", never_garbage_collect, 0, 0, 0, default)
-    current_object.object[0] = monitor_object -- Save the monitor, inside the current object.
-end
-
-function handle_attachables()
-    for each object with label "attachable_obj" do
-        if current_object.object[0] == no_object then -- If the monitor doesn't exists on this object.
-            initialize_new_attachable()
+    for each object with label "teleporter_spawnpoint" do
+        if current_object.object[0] == no_object then -- If "teleporter" doesn't exists on this "teleporter_spawnpoint".
+            current_object.timer[0].set_rate(100%) -- Starts the timer to spawn the "teleporter" again.
+            
+            if current_object.timer[0] >= 3 then
+                teleporter = current_object.place_at_me(monitor, "teleporter", never_garbage_collect, 0, 0, 0, default)
+                current_object.object[0] = teleporter -- Save the "teleporter", inside the "teleporter_spawnpoint".
+                current_object.timer[0].set_rate(0%) -- Stops the timer to spawn the "teleporter" again.
+                current_object.timer[0] = 0 -- Sets the timer value to zero.
+            end
         end
     end
 end 
 
-function attach_player()
-    send_incident(teleporter_used, current_player, all_players)
-    current_player.biped.attach_to(current_aim_target, 0, 0, 0, relative) -- Attach player to the specified object.
-    current_aim_target.delete() -- Delete the monitor.
-    is_player_attached = 1
+-- Summary:
+-- Makes sure every monitor has its health low enough to be destroyable with a single shot.
+function handle_monitors_health()
+    alias monitor_state = allocate global.number
+
+    for each object with label "teleporter" do
+        monitor_state = current_object.shields
+        if monitor_state > 0 then
+            current_object.shields = 0
+        end
+
+        monitor_state = current_object.health
+        if monitor_state > 10 then
+            current_object.health = 10
+        end
+    end
 end
 
-function detach_player()
-    current_player.biped.detach() -- Execute detach
-    is_player_attached = 0
-end
+-- Summary:
+-- Makes sure every player its teleported if has destroyed a monitor,
+-- adding a delay to the detach, allowing the teleport its valid for the server. 
+function handle_players_teleportation()
+    alias ticks_delay = allocate global.number
+    ticks_delay = 20
 
-function handle_player_attachements()
     for each player do
-        if current_player.biped != no_object then
-            current_aim_target = current_player.get_crosshair_target() -- Get the object the player is aiming at.
-
-            if current_aim_target.has_forge_label("monitor_obj") then -- If the object has the specified label.
-                monitor_shields_health = current_aim_target.shields -- Get the shields health.
-
-                if monitor_shields_health < 80 then
-                    attach_player()
-                end
-            end
-
-            if is_player_attached == 1 then
-                detach_player()
+        if current_player.object[0] != no_object then -- If the player detroyed a monitor.
+            object_to_attach = current_player.object[0]
+            current_player.biped.attach_to(object_to_attach, 0, 0, 0, relative) -- Attach player to the monitor previous position.
+            current_player.number[0] = 1 -- Flag: Player has been teleported.
+        end
+        
+        if current_player.number[0] == 1 then -- If the player has been teleported.
+            current_player.number[1] += 1 -- Every single tick, this number increases by one.
+            
+            if current_player.number[1] >= ticks_delay then -- If the player has been attached for 20 or more ticks.
+                current_player.biped.detach()
+                object_to_attach.delete()
+                
+                current_player.object[0] = no_object -- Cleaning.
+                current_player.number[0] = 0 -- The player has not been teleported.
+                current_player.number[1] = 0 -- The ticks counter is reseted.
             end
         end
     end
 end
 
-do -- kinda start method
-    handle_attachables()
-    handle_player_attachements()
+do
+    handle_teleporters_spawnpoint()
+    handle_players_teleportation()
+    handle_monitors_health()
+end
+
+on object death: do
+    if killed_object.has_forge_label("teleporter") then -- If the object destroyed has the "teleporter" label.
+        object_to_attach = killed_object.place_at_me(hill_marker, "object_to_attach", never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
+        killer_player.object[0] = object_to_attach -- Assign the spawned object directly to the player.
+        object_to_attach = no_object -- Cleaning.
+    end
 end
