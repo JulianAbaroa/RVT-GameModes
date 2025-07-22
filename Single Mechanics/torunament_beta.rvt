@@ -1,0 +1,7 @@
+for each player do
+    if current_player.team != team[0] then -- If the player it's not from red team.
+        if current_player.team != team[1] then -- If the player it's not from blue team.
+            
+        end
+    end
+end

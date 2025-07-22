@@ -1,7 +1,5 @@
 alias object_to_attach = allocate global.object -- Placeholder object used to "teleport" the player to it's position.
 
--- Probar send_incident antes de ser teletransportado.
-
 -- Summary:
 -- Makes sure every "teleporter_spawnpoint" object has its respective "teleporter" object.
 function handle_teleporters_spawnpoint()
