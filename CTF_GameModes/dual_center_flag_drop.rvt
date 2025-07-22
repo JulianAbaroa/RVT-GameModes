@@ -1,3 +1,5 @@
+-- No tiene añadido el fix de compatibilidad.
+
 declare global.number[0] with network priority local
 declare global.number[1] with network priority local
 declare global.number[2] with network priority low
