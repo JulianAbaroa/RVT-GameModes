@@ -62,7 +62,7 @@ alias teleporter = global.object[3] -- Monitor that it's attached to the attacha
 declare global.number[5]
 alias monitor_state = global.number[5] -- Monitor shields and health.
 
-declare global.number[6] = 20
+declare global.number[6] = 30
 alias ticks_delay = global.number[6] -- The ticks delay before detach the teleported player.
 
 declare object.object[1] -- Flag: determines wether a telporter spawnpoint has a teleporter.
@@ -572,34 +572,67 @@ function handle_flag_carrier_killed_incident()
     end
 end
 
+-- Hacer un rework completo a las respawn zones del CTF.
 function handle_flag_respawn_zones()
     if current_team.has_any_players() then -- If this team has any players.
         flag_or_biped_reference = current_team.object[1] -- Set the flag reference as the current team's flag.
 
-        if flag_or_biped_reference != no_object then -- If this team's flag doesn't exists.
-            for each object with label "ctf_res_zone" do -- Flag respawn zone (usually team's base), where the flag it's going to respawn.
-                if current_object.team == current_team then -- If this flag stand it's from this team.
-                    current_object.enable_spawn_zone(0)
-                    current_object.set_shape_visibility(no_one)
-                    current_object.set_invincibility(1)
-                    current_object.set_pickup_permissions(no_one)
+        if flag_or_biped_reference != no_object then -- If this team's flag exists.
+            alias flag_hill_marker = allocate global.object
+            flag_hill_marker = flag_or_biped_reference.object[0]
 
-                    if flag_or_biped_reference.number[0] == 0 then -- If the flag hasn't been carried.
-                        current_object.enable_spawn_zone(1) -- The flag can respawn?
+            for each object with label "team_base" do
+                if current_object.team == current_team then
+                    if current_object.shape_contains(flag_hill_marker) then
+                        flag_hill_marker.number[0] = 0 -- flag on base.
                     end
                 end
             end
 
-            for each object with label "ctf_res_zone_away" do -- Flag respawn zone away (usually a place between team's bases), where the flag it's going to respawn.
-                if current_object.team == current_team then -- If this flag stand it's from this team.
-                    current_object.enable_spawn_zone(0)
+            for each object with label "middle" do
+                if current_object.shape_contains(flag_hill_marker) then
+                    flag_hill_marker.number[0] = 1 -- flag on middle.
+                end
+            end
+
+            for each object with label "bottom" do
+                if current_object.shape_contains(flag_hill_marker) then
+                    flag_hill_marker.number[0] = 2 -- flag on bottom.
+                end
+            end
+
+            for each object with label "primary_res_zone" do
+                if current_object.team == current_team then -- If this respawn zone it's from the current team.
+                    current_object.enable_spawn_zone(0) -- Cleaning
                     current_object.set_shape_visibility(no_one)
                     current_object.set_invincibility(1)
                     current_object.set_pickup_permissions(no_one)
 
-                    if not flag_or_biped_reference.number[0] == 0 then 
+                    if flag_hill_marker.number[0] == 0 then -- If the flag is at base
                         current_object.enable_spawn_zone(1)
                     end
+                end
+            end
+
+            for each object with label "secondary_res_zone" do
+                current_object.enable_spawn_zone(0) -- Cleaning
+                current_object.set_shape_visibility(no_one)
+                current_object.set_invincibility(1)
+                current_object.set_pickup_permissions(no_one)
+
+                if flag_hill_marker.number[0] == 1 then -- If the flag is at middle.
+                    current_object.enable_spawn_zone(1)
+                end
+            end
+
+            for each object with label "tertiary_res_zone" do
+                current_object.enable_spawn_zone(0) -- Cleaning
+                current_object.set_shape_visibility(no_one)
+                current_object.set_invincibility(1)
+                current_object.set_pickup_permissions(no_one)
+
+                if flag_hill_marker.number[0] == 2 then -- If the flag is at bottom.
+                    current_object.enable_spawn_zone(1)
                 end
             end
         end
