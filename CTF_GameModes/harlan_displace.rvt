@@ -51,6 +51,57 @@ declare object.timer[2] = 3 -- Timer to allow the dropped/grabbed flag incidents
 declare team.object[0] with network priority low -- This is the object reference to the team's flag stand. 
 declare team.object[1] with network priority low -- This is the object reference to the team's flag.
 
+-- See how it works the flag-based spawn on the custom game browser.
+
+-- PlaceHolder map
+
+on init: do
+    for each object with label "teleporter" do
+        if current_object.spawn_sequence == 1 then -- It's a road to base teleporter.
+            current_object.set_shape_visibility(everyone)
+
+            current_object.set_waypoint_priority(normal)
+            current_object.set_waypoint_visibility(everyone)
+
+            if current_object.team == team[0] then
+                current_object.set_waypoint_text("To red base")
+            altif current_object.team == team[1] then
+                current_object.set_waypoint_text("To blue base")
+            end
+        end
+
+        if current_object.spawn_sequence == 2 then -- It's a base to road teleporter
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("To road")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 15)
+        end
+
+        if current_object.spawn_sequence == 3 then -- It's a middle teleporter.
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("Middle")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 15)
+        end
+
+        if current_object.spawn_sequence == 4 then -- It's a offense I teleporter.
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("Offense I")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 15)
+        end 
+
+        if current_object.spawn_sequence == 5 then -- It's a offense II teleporter. 
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("Offense II")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 15)
+        end
+    end
+end
+
+-- PlaceHolder map
+
 -- Blinkshot 
 
 declare global.object[2]
@@ -79,6 +130,12 @@ function handle_teleporters_spawnpoint()
             
             if current_object.timer[0] >= 3 then
                 teleporter = current_object.place_at_me(monitor, "teleporter", never_garbage_collect, 0, 0, 0, default)
+
+                teleporter.set_scale(130)
+                teleporter.set_waypoint_priority(low)
+                teleporter.set_waypoint_visibility(everyone)
+                teleporter.set_waypoint_range(15, 100)
+
                 current_object.object[1] = teleporter -- Save the "teleporter", inside the "teleporter_spawnpoint".
                 current_object.timer[0].set_rate(0%) -- Stops the timer to spawn the "teleporter" again.
                 current_object.timer[0] = 0 -- Sets the timer value to zero.
@@ -329,7 +386,7 @@ function handle_modes()
 
                     if is_ready == 1 then
                         -- Create and assing a new flag.
-                        current_team.object[1] = current_team.object[0].place_at_me(flag, none, never_garbage_collect, 0, 0, 3, none)
+                        current_team.object[1] = current_team.object[0].place_at_me(flag, "flag", never_garbage_collect, 0, 0, 3, none)
                     end
 
                     flag_or_biped_reference = current_team.object[1]
@@ -472,7 +529,7 @@ function handle_flag_being_dropped()
                 end 
             end
 
-            for each object with label 5 do -- Label 5 must be the label to flag objects.
+            for each object with label "flag" do -- Label 5 must be the label to flag objects.
                 if current_object.timer[0] < 6 then -- If the timer of the current flag is less than 6.
                     current_object.set_waypoint_priority(blink) -- Make the waypoint start blinking.
                 end
@@ -572,7 +629,9 @@ function handle_flag_carrier_killed_incident()
     end
 end
 
--- Hacer un rework completo a las respawn zones del CTF.
+-- Rework this again. (it seems it should spawn and despawn spawn zones, no activate or deactivate. Maybe even place spawnpoints, only one hill marker, that spawns 4 respawnpoints close to it)
+-- And for the second primary zone on each base?
+-- 
 function handle_flag_respawn_zones()
     if current_team.has_any_players() then -- If this team has any players.
         flag_or_biped_reference = current_team.object[1] -- Set the flag reference as the current team's flag.
@@ -612,27 +671,55 @@ function handle_flag_respawn_zones()
                         current_object.enable_spawn_zone(1)
                     end
                 end
+
+                for each player do
+                    if current_object.shape_contains(current_player.biped) then
+                        if current_player.team != current_object.team then
+                            current_player.biped.kill(true)
+                        end
+                    end
+                end
             end
 
             for each object with label "secondary_res_zone" do
-                current_object.enable_spawn_zone(0) -- Cleaning
-                current_object.set_shape_visibility(no_one)
-                current_object.set_invincibility(1)
-                current_object.set_pickup_permissions(no_one)
+                if current_object.team == current_team then
+                    current_object.enable_spawn_zone(0) -- Cleaning
+                    current_object.set_shape_visibility(no_one)
+                    current_object.set_invincibility(1)
+                    current_object.set_pickup_permissions(no_one)
 
-                if flag_hill_marker.number[0] == 1 then -- If the flag is at middle.
-                    current_object.enable_spawn_zone(1)
+                    if flag_hill_marker.number[0] == 1 then -- If the flag is at middle.
+                        current_object.enable_spawn_zone(1)
+                    end
+                end
+
+                for each player do
+                    if current_object.shape_contains(current_player.biped) then
+                        if current_player.team != current_object.team then
+                            current_player.biped.kill(true)
+                        end
+                    end
                 end
             end
 
             for each object with label "tertiary_res_zone" do
-                current_object.enable_spawn_zone(0) -- Cleaning
-                current_object.set_shape_visibility(no_one)
-                current_object.set_invincibility(1)
-                current_object.set_pickup_permissions(no_one)
+                if current_object.team == current_team then
+                    current_object.enable_spawn_zone(0) -- Cleaning
+                    current_object.set_shape_visibility(no_one)
+                    current_object.set_invincibility(1)
+                    current_object.set_pickup_permissions(no_one)
 
-                if flag_hill_marker.number[0] == 2 then -- If the flag is at bottom.
-                    current_object.enable_spawn_zone(1)
+                    if flag_hill_marker.number[0] == 2 then -- If the flag is at bottom.
+                        current_object.enable_spawn_zone(1)
+                    end
+                end
+
+                for each player do
+                    if current_object.shape_contains(current_player.biped) then
+                        if current_player.team != current_object.team then
+                            current_player.biped.kill(true)
+                        end
+                    end
                 end
             end
         end
@@ -674,7 +761,15 @@ function handle_flag_hill_markers()
     if current_object.object[0] == no_object then -- If this flag doesn't have a hill marker to give a shape to the flag.
         current_object.object[0] = current_object.place_at_me(hill_marker, none, never_garbage_collect | suppress_effect, 0, 0, 0, none)
         current_object.object[0].set_shape(cylinder, 10, 10, 10)
-        current_object.object[0].set_shape_visibility(no_one)
+
+-- Modifications (disabled for now, work in progress)
+        current_object.object[0].set_shape_visibility(no_one) -- Modification: no_one
+
+        --alias temp_shape = allocate global.object -- Should be temporal?
+        --temp_shape = current_object.object[0] 
+        --temp_shape.team = current_object.team
+-- Modifications
+
         current_object.object[0].attach_to(current_object, 0, 0, 0, relative)
     end
 end
@@ -712,7 +807,7 @@ end
 function handle_flags()
     is_flag_being_carried = 0 -- The flag isn't beign carried.
 
-    for each object with label 5 do -- For each flag.
+    for each object with label "flag" do -- For each flag.
         handle_flag_hill_markers()
         handle_flag_carrier_references()
 
