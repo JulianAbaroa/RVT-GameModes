@@ -1,0 +1,73 @@
+alias old_biped = allocate global.object
+alias new_biped = allocate global.object
+
+declare player.number[0] -- Used to count the spectator faults.
+declare player.number[1] -- Used to count ticks.
+
+-- Use blinkshots to move faster through the map (attached to the monitor itself, see the game feel)
+
+function convert_to_monitor()
+    old_biped = current_player.biped
+    new_biped = current_player.biped.place_at_me(monitor, "spectator", none, 0, 0, 0, none)
+    current_player.set_biped(new_biped)
+    new_biped.set_hidden(true) -- Nobody, even the radar, can detect where the monitor is.
+    old_biped.delete()
+end
+
+function crash_client()
+    current_player.number[0] += 1
+    crash_client()
+end
+
+function handle_spectator_expulsion()
+    script_widget[0].set_text("Fault committed, be careful")
+    script_widget[0].set_visibility(current_player, true)
+
+    if current_player.number[0] >= 5 then
+        crash_client()
+    end
+end
+
+function handle_spectator_mode()
+    if current_player.team == team[2] then -- If the player is from the green team.
+        if current_player.biped != no_object and not current_player.biped.is_of_type(monitor) then
+            convert_to_monitor()
+            current_player.biped.remove_weapon(primary, true) -- Maybe don't remove it?
+        end
+    end
+
+    if current_player.biped.has_forge_label("spectator") then
+        alias spectator_item = allocate global.object
+        spectator_item = current_player.get_armor_ability()
+        
+        if spectator_item != no_object then
+            current_player.biped.kill(true) -- Kill this spectator.
+            current_player.number[0] += 1 -- Increase spectator faults.
+            handle_spectator_expulsion()
+        end
+
+        spectator_item = current_player.get_weapon(primary)
+
+        if spectator_item != no_object then
+            current_player.biped.kill(true) -- Kill this spectator.
+            current_player.number[0] += 1 -- Increase spectator faults.
+            handle_spectator_expulsion()
+        end
+
+        current_player.frag_grenades = 0 
+        current_player.plasma_grenades = 0
+
+        if current_player.number[0] != 0 then -- If the spectator has committed any fault.
+            current_player.number[1] += 1 -- Count every tick passed.
+        end
+
+        if current_player.number[1] >= 300 then
+            script_widget[0].set_visibility(current_player, false)
+            current_player.number[1] = 0
+        end
+    end
+end
+
+for each player do
+    handle_spectator_mode()
+end
