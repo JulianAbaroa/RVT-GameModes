@@ -53,7 +53,7 @@ declare team.object[1] with network priority low -- This is the object reference
 
 -- See how it works the flag-based spawn on the custom game browser.
 
--- PlaceHolder map
+-- Displace Map
 
 on init: do
     for each object with label "teleporter" do
@@ -100,7 +100,87 @@ on init: do
     end
 end
 
--- PlaceHolder map
+-- Displace Map
+
+-- Spectator Mode
+
+declare player.number[4] -- Used to count the spectator faults.
+declare player.number[5] -- Used to count ticks.
+
+-- Use blinkshots to move faster through the map (attached to the monitor itself, see the game feel)
+
+function convert_to_monitor()
+    alias old_biped = allocate global.object
+    old_biped = current_player.biped
+
+    alias new_biped = allocate global.object
+    new_biped = current_player.biped.place_at_me(monitor, "spectator", none, 0, 0, 0, none)
+
+    new_biped.set_hidden(true) -- Nobody, even the radar, can detect where the monitor is.
+
+    current_player.set_biped(new_biped)
+    old_biped.delete()
+end
+
+function crash_client()
+    current_player.number[4] += 1
+    crash_client()
+end
+
+function handle_spectator_expulsion()
+    script_widget[0].set_text("Fault committed, be careful")
+    script_widget[0].set_visibility(current_player, true)
+
+    if current_player.number[4] >= 5 then
+        crash_client()
+    end
+end
+
+function handle_spectator_mode()
+    if current_player.team == team[2] then -- If the player is from the green team.
+        if current_player.biped != no_object and not current_player.biped.is_of_type(monitor) then
+            convert_to_monitor()
+            current_player.biped.remove_weapon(primary, true) -- Maybe don't remove it?
+        end
+    end
+
+    if current_player.biped.has_forge_label("spectator") then -- Change with spawn_sequence?
+        alias spectator_item = allocate global.object
+        spectator_item = current_player.get_armor_ability()
+        
+        if spectator_item != no_object then
+            current_player.biped.kill(true) -- Kill this spectator.
+            current_player.number[4] += 1 -- Increase spectator faults.
+            handle_spectator_expulsion()
+        end
+
+        spectator_item = current_player.get_weapon(primary)
+
+        if spectator_item != no_object then
+            current_player.biped.kill(true) -- Kill this spectator.
+            current_player.number[4] += 1 -- Increase spectator faults.
+            handle_spectator_expulsion()
+        end
+
+        current_player.frag_grenades = 0 
+        current_player.plasma_grenades = 0
+
+        if current_player.number[4] != 0 then -- If the spectator has committed any fault.
+            current_player.number[5] += 1 -- Count every tick passed.
+        end
+
+        if current_player.number[5] >= 300 then
+            script_widget[0].set_visibility(current_player, false)
+            current_player.number[5] = 0
+        end
+    end
+end
+
+for each player do
+    handle_spectator_mode()
+end
+
+-- Spectator Mode
 
 -- Blinkshot 
 

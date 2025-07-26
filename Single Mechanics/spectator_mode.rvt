@@ -4,7 +4,8 @@ alias new_biped = allocate global.object
 declare player.number[0] -- Used to count the spectator faults.
 declare player.number[1] -- Used to count ticks.
 
--- Use blinkshots to move faster through the map (attached to the monitor itself, see the game feel)
+-- Players on cbg can actually see the monitor.
+-- Hide the green team score.
 
 function convert_to_monitor()
     old_biped = current_player.biped
