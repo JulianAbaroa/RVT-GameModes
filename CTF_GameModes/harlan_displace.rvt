@@ -53,9 +53,19 @@ declare team.object[1] with network priority low -- This is the object reference
 
 -- See how it works the flag-based spawn on the custom game browser.
 
+on init: do
+
+-- Spectator Mode
+
+    for each player do
+        script_widget[1].set_text("Fault committed, be careful")
+        script_widget[1].set_visibility(current_player, false)
+    end
+
+-- Spectator Mode
+
 -- Displace Map
 
-on init: do
     for each object with label "teleporter" do
         if current_object.spawn_sequence == 1 then -- It's a road to base teleporter.
             current_object.set_shape_visibility(everyone)
@@ -74,104 +84,185 @@ on init: do
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("To road")
             current_object.set_waypoint_priority(low)
-            current_object.set_waypoint_range(0, 15)
+            current_object.set_waypoint_range(0, 20)
         end
 
         if current_object.spawn_sequence == 3 then -- It's a middle teleporter.
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("Middle")
             current_object.set_waypoint_priority(low)
-            current_object.set_waypoint_range(0, 15)
+            current_object.set_waypoint_range(0, 20)
         end
 
         if current_object.spawn_sequence == 4 then -- It's a offense I teleporter.
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("Offense I")
             current_object.set_waypoint_priority(low)
-            current_object.set_waypoint_range(0, 15)
+            current_object.set_waypoint_range(0, 20)
         end 
 
         if current_object.spawn_sequence == 5 then -- It's a offense II teleporter. 
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("Offense II")
             current_object.set_waypoint_priority(low)
-            current_object.set_waypoint_range(0, 15)
+            current_object.set_waypoint_range(0, 20)
+        end
+
+        if current_object.spawn_sequence == 6 then
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("Up")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 20)
+        end
+
+        if current_object.spawn_sequence == 7 then
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("Down")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 20)
+        end
+
+        if current_object.spawn_sequence == 8 then
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("Bottom")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 20)
         end
     end
-end
 
 -- Displace Map
+
+end
 
 -- Spectator Mode
 
 declare player.number[4] -- Used to count the spectator faults.
-declare player.number[5] -- Used to count ticks.
+declare player.timer[3] = 0 -- Used to disable the warning hud.
+
+declare global.object[4] with network priority local
+alias crosshair_target = global.object[4]
+
+declare global.player[2] with network priority local
+alias client = global.player[2]
+
+declare global.player[3] with network priority low
+alias spectator_to_kill = global.player[3]
 
 -- Use blinkshots to move faster through the map (attached to the monitor itself, see the game feel)
+
+function crash_client()
+    crash_client()
+end
+
+function handle_spectators_team() 
+    if current_team == team[2] then
+        if current_team.has_any_players() then
+            if current_team.score != -1 then
+                current_team.score = -1
+            end
+        end
+    end
+end
+
+on local: do
+    for each player do
+        if current_player.timer[3] > 0 then
+            script_widget[1].set_visibility(current_player, true)
+        altif current_player.timer[3] == 0 then
+            script_widget[1].set_visibility(current_player, false)
+        end
+
+        if current_player.team == team[2] then
+            if client == no_player then
+                crosshair_target = current_player.get_crosshair_target()
+
+                if crosshair_target != no_object then
+                    client = current_player
+                    crosshair_target.delete()
+                    client.biped.remove_weapon(primary, true)
+                end
+            end
+        end
+        
+        if client != no_player then
+            script_widget[2].set_text("Player %n finded.", client)
+            script_widget[2].set_visibility(client, true)
+        altif client == no_player then
+            script_widget[2].set_visibility(client, false)
+        end
+
+        if current_player.number[4] >= 5 then
+            spectator_to_kill = current_player
+
+            if client != no_player and client == current_player and client == spectator_to_kill then
+                crash_client()
+            end
+        end
+    end
+
+    for each object with label "spectator" do
+        if current_object.number[0] == 0 then
+            current_object.set_hidden(true) -- Nobody, even the radar, can detect where the monitor is.
+            current_object.number[0] = 1
+        end
+    end
+
+    for each team do
+        handle_spectators_team()
+    end
+end
 
 function convert_to_monitor()
     alias old_biped = allocate global.object
     old_biped = current_player.biped
 
     alias new_biped = allocate global.object
-    new_biped = current_player.biped.place_at_me(monitor, "spectator", none, 0, 0, 0, none)
-
-    new_biped.set_hidden(true) -- Nobody, even the radar, can detect where the monitor is.
-
+    new_biped = old_biped.place_at_me(monitor, "spectator", none, 0, 0, 0, none)
+    
     current_player.set_biped(new_biped)
     old_biped.delete()
-end
 
-function crash_client()
-    current_player.number[4] += 1
-    crash_client()
-end
-
-function handle_spectator_expulsion()
-    script_widget[0].set_text("Fault committed, be careful")
-    script_widget[0].set_visibility(current_player, true)
-
-    if current_player.number[4] >= 5 then
-        crash_client()
+    if client == no_player then
+        current_player.object[0] = current_player.biped.place_at_me(monitor, none, none, 5, 0, 0, none)
+        current_player.object[0].set_scale(1)
+        current_player.biped.face_toward(current_player.object[0], 0, 0, 0)
+    altif client != no_player then
+        current_player.biped.remove_weapon(primary, true)
     end
 end
 
 function handle_spectator_mode()
     if current_player.team == team[2] then -- If the player is from the green team.
-        if current_player.biped != no_object and not current_player.biped.is_of_type(monitor) then
+        if not current_player.biped.is_of_type(monitor) then
             convert_to_monitor()
-            current_player.biped.remove_weapon(primary, true) -- Maybe don't remove it?
         end
     end
 
-    if current_player.biped.has_forge_label("spectator") then -- Change with spawn_sequence?
-        alias spectator_item = allocate global.object
-        spectator_item = current_player.get_armor_ability()
-        
-        if spectator_item != no_object then
-            current_player.biped.kill(true) -- Kill this spectator.
-            current_player.number[4] += 1 -- Increase spectator faults.
-            handle_spectator_expulsion()
+    if current_player.biped.has_forge_label("spectator") then
+        alias spectator_ability = allocate global.object
+        spectator_ability = current_player.get_armor_ability()
+
+        alias spectator_weapon = allocate global.object
+        if client != no_player then
+            spectator_weapon = current_player.get_weapon(primary)
         end
 
-        spectator_item = current_player.get_weapon(primary)
-
-        if spectator_item != no_object then
-            current_player.biped.kill(true) -- Kill this spectator.
+        if spectator_ability != no_object or spectator_weapon != no_object then
+            current_player.biped.kill(true)
             current_player.number[4] += 1 -- Increase spectator faults.
-            handle_spectator_expulsion()
+            current_player.timer[3].set_rate(100%)
         end
+
+        spectator_ability = no_object -- Cleaning
+        spectator_weapon = no_object -- Cleaning
 
         current_player.frag_grenades = 0 
         current_player.plasma_grenades = 0
 
-        if current_player.number[4] != 0 then -- If the spectator has committed any fault.
-            current_player.number[5] += 1 -- Count every tick passed.
-        end
-
-        if current_player.number[5] >= 300 then
-            script_widget[0].set_visibility(current_player, false)
-            current_player.number[5] = 0
+        if current_player.timer[3] >= 5 then
+            script_widget[1].set_visibility(current_player, false)
+            current_player.timer[3].set_rate(0%)
+            current_player.timer[3].reset()
         end
     end
 end
@@ -193,7 +284,7 @@ alias teleporter = global.object[3] -- Monitor that it's attached to the attacha
 declare global.number[5]
 alias monitor_state = global.number[5] -- Monitor shields and health.
 
-declare global.number[6] = 30
+declare global.number[6] = 40
 alias ticks_delay = global.number[6] -- The ticks delay before detach the teleported player.
 
 declare object.object[1] -- Flag: determines wether a telporter spawnpoint has a teleporter.
@@ -254,7 +345,7 @@ function handle_players_teleportation()
         if current_player.number[2] == 1 then -- If the player has been teleported.
             current_player.number[3] += 1 -- Every single tick, this number increases by one.
             
-            if current_player.number[3] >= ticks_delay then -- If the player has been attached for 20 or more ticks.
+            if current_player.number[3] >= ticks_delay then -- If the player has been attached for 40 or more ticks.
                 current_player.biped.detach()
                 object_to_attach.delete()
                 

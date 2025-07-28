@@ -4,9 +4,6 @@ alias new_biped = allocate global.object
 declare player.number[0] -- Used to count the spectator faults.
 declare player.number[1] -- Used to count ticks.
 
--- Players on cbg can actually see the monitor.
--- Hide the green team score.
-
 function convert_to_monitor()
     old_biped = current_player.biped
     new_biped = current_player.biped.place_at_me(monitor, "spectator", none, 0, 0, 0, none)
@@ -29,8 +26,18 @@ function handle_spectator_expulsion()
     end
 end
 
+function handle_spectators_team() 
+    if current_team == neutral_team then
+        if current_team.has_any_players() then
+            if current_team.score != -1 then
+                current_team.score = -1
+            end
+        end
+    end
+end
+
 function handle_spectator_mode()
-    if current_player.team == team[2] then -- If the player is from the green team.
+    if current_player.team == neutral_team then -- If the player is from the green team.
         if current_player.biped != no_object and not current_player.biped.is_of_type(monitor) then
             convert_to_monitor()
             current_player.biped.remove_weapon(primary, true) -- Maybe don't remove it?
@@ -71,4 +78,14 @@ end
 
 for each player do
     handle_spectator_mode()
+end
+
+for each team do
+    handle_spectators_team()
+end
+
+on local: do
+    if new_biped != no_object then
+        new_biped.set_hidden(true)
+    end
 end
