@@ -58,7 +58,7 @@ on init: do
 -- Spectator Mode
 
     for each player do
-        script_widget[1].set_text("Fault committed, be careful")
+        script_widget[1].set_text("Fault committed, be careful!")
         script_widget[1].set_visibility(current_player, false)
     end
 
@@ -138,6 +138,7 @@ end
 
 declare player.number[4] -- Used to count the spectator faults.
 declare player.timer[3] = 0 -- Used to disable the warning hud.
+declare player.object[3] -- Used to store temporarily the monitor to get the local client.
 
 declare global.object[4] with network priority local
 alias crosshair_target = global.object[4]
@@ -147,8 +148,6 @@ alias client = global.player[2]
 
 declare global.player[3] with network priority low
 alias spectator_to_kill = global.player[3]
-
--- Use blinkshots to move faster through the map (attached to the monitor itself, see the game feel)
 
 function crash_client()
     crash_client()
@@ -164,54 +163,6 @@ function handle_spectators_team()
     end
 end
 
-on local: do
-    for each player do
-        if current_player.timer[3] > 0 then
-            script_widget[1].set_visibility(current_player, true)
-        altif current_player.timer[3] == 0 then
-            script_widget[1].set_visibility(current_player, false)
-        end
-
-        if current_player.team == team[2] then
-            if client == no_player then
-                crosshair_target = current_player.get_crosshair_target()
-
-                if crosshair_target != no_object then
-                    client = current_player
-                    crosshair_target.delete()
-                    client.biped.remove_weapon(primary, true)
-                end
-            end
-        end
-        
-        if client != no_player then
-            script_widget[2].set_text("Player %n finded.", client)
-            script_widget[2].set_visibility(client, true)
-        altif client == no_player then
-            script_widget[2].set_visibility(client, false)
-        end
-
-        if current_player.number[4] >= 5 then
-            spectator_to_kill = current_player
-
-            if client != no_player and client == current_player and client == spectator_to_kill then
-                crash_client()
-            end
-        end
-    end
-
-    for each object with label "spectator" do
-        if current_object.number[0] == 0 then
-            current_object.set_hidden(true) -- Nobody, even the radar, can detect where the monitor is.
-            current_object.number[0] = 1
-        end
-    end
-
-    for each team do
-        handle_spectators_team()
-    end
-end
-
 function convert_to_monitor()
     alias old_biped = allocate global.object
     old_biped = current_player.biped
@@ -222,14 +173,21 @@ function convert_to_monitor()
     current_player.set_biped(new_biped)
     old_biped.delete()
 
-    if client == no_player then
-        current_player.object[0] = current_player.biped.place_at_me(monitor, none, none, 5, 0, 0, none)
-        current_player.object[0].set_scale(1)
-        current_player.biped.face_toward(current_player.object[0], 0, 0, 0)
-    altif client != no_player then
+    if current_player.number[4] == 0 then
+        current_player.object[3] = current_player.biped.place_at_me(monitor, "trash", none, 5, 0, 0, none)
+        current_player.object[3].set_scale(100)
+        current_player.biped.face_toward(current_player.object[3], 0, 0, 0)
+    altif current_player.number[4] != 0 then
         current_player.biped.remove_weapon(primary, true)
     end
 end
+
+-- Some things have to run on local and others on all, but idk how to know when use each one of those.
+-- Todo lo relacionado a manejar el estado del espectador, tiene que correr en local:
+-- - La transición a monitor
+-- - Si tomo un arma/habilidad
+-- - Los faults, los hud's
+-- Todo lo relacionado a marcar al jugador para expulsarlo, tiene que correr en all.
 
 function handle_spectator_mode()
     if current_player.team == team[2] then -- If the player is from the green team.
@@ -243,7 +201,8 @@ function handle_spectator_mode()
         spectator_ability = current_player.get_armor_ability()
 
         alias spectator_weapon = allocate global.object
-        if client != no_player then
+
+        if current_player.number[4] > 0 then
             spectator_weapon = current_player.get_weapon(primary)
         end
 
@@ -267,8 +226,58 @@ function handle_spectator_mode()
     end
 end
 
+on local: do
+    for each player do
+        if current_player.timer[3] > 0 then
+            script_widget[1].set_visibility(current_player, true)
+        altif current_player.timer[3] == 0 then
+            script_widget[1].set_visibility(current_player, false)
+        end
+
+        if current_player.team == team[2] and current_player.biped.is_of_type(monitor) then
+            if client == no_player then
+                crosshair_target = current_player.get_crosshair_target()
+
+                if crosshair_target != no_object then
+                    client = current_player
+                    current_player.biped.remove_weapon(primary, true)
+                end
+            end
+        end
+
+        if client != no_player and client == spectator_to_kill then
+            crash_client()
+        end
+    end
+
+    for each object with label "spectator" do
+        if current_object.number[0] == 0 then
+            current_object.set_hidden(true) -- Nobody, even the radar, can detect where the monitor is.
+            current_object.number[0] = 1
+        end
+    end
+
+    for each team do
+        handle_spectators_team()
+    end
+end
+
 for each player do
-    handle_spectator_mode()
+    if current_player.number[4] >= 5 then -- Sets the player to kick to all.
+        spectator_to_kill = current_player
+    end
+end
+
+do
+    for each object with label "trash" do
+        current_object.timer[0].set_rate(100%)
+
+        if current_object.timer[0] >= 1 then
+            current_object.timer[0].set_rate(0%)
+            current_object.timer[0] = 0
+            current_object.delete()
+        end
+    end
 end
 
 -- Spectator Mode
