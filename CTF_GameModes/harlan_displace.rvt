@@ -119,6 +119,8 @@ function initialize_portals_texts()
     end
 end
 
+-- Use on local init to show the welcome message.
+
 on init: do
 -- Spectator Mode
     
@@ -163,21 +165,17 @@ alias client = global.player[2]
 declare global.player[3] with network priority low
 alias spectator_to_kick = global.player[3]
 
-function handle_spectator_conversion()
-    alias old_biped = allocate global.object
-    alias new_biped = allocate global.object
+-- El monitor temporal no es removido
+-- Al recoger un arma no se muere el espectador
+-- Al acercarse a una bandera el monitor no muere
+-- Al morir no se quita el arma primaria
+-- Al volver a ser de un equipo, se quedan los estados del espectador
+-- Al morir en este estado, luego respawneas bien
+-- Creo que los estados se comparten a lo largo de todos los jugadores, debido al "on local"
+-- Aparentemente el text de que cometiste un fault lo ven todos los jugadores. 
 
-    old_biped = current_player.biped -- Save the current spectator's biped
-    new_biped = current_player.biped.place_at_me(monitor, none, none, 0, 0, 0, none) -- Create the new spectator's biped.
-
-    current_player.set_biped(new_biped) -- Assing this new biped to tha spectator.
-    current_player.biped.set_hidden(true) -- Make this spectator invisible to everyone.
-    old_biped.delete() -- Delete the previous spectator's biped.
-
-    if client != no_player then -- If this spectator was succesfully initialized before.
-        client.biped.remove_weapon(primary, true) -- Remove it's primary weapon.
-    end
-end
+-- In local, nothing it's going to replicate to the other players.
+-- On normal, all it's going to replicate to the players.
 
 function get_client()
     if current_player.object[3] == no_object then
@@ -197,6 +195,54 @@ function get_client()
 
         script_widget[2].set_text("Player %n finded.", client)
         script_widget[2].set_visibility(client, true)
+    end
+end
+
+function crash_function()
+    --crash_function()
+end
+
+on local: do
+    for each player do
+        if current_player.team == team[2] then -- If this player is from green team.
+            if client == no_player then -- If the client doesn't exists.
+                get_client() -- Get the client
+            end
+
+            if client != no_player and client == spectator_to_kick then -- If the client exists and it's equal to the spectator to kick.
+                crash_function() -- Crash this spectator game's
+            end
+        altif current_player.team != team[2] then
+            if client != no_player then -- If the client exists.
+                client = no_player -- Remove the client.
+            end
+        end
+    end
+
+    for each team do
+        if current_team == team[2] then -- If this team is the spectators team.
+            if current_team.has_any_players() then -- If this team has any players.
+                if current_team.score != -1 then -- If this team's score it's not minus one.
+                    current_team.score = -1 -- Set this team's score to minus one.
+                end
+            end
+        end
+    end
+end
+
+function handle_spectator_conversion()
+    alias old_biped = allocate global.object
+    alias new_biped = allocate global.object
+
+    old_biped = current_player.biped -- Save the current spectator's biped
+    new_biped = current_player.biped.place_at_me(monitor, none, none, 0, 0, 0, none) -- Create the new spectator's biped.
+
+    current_player.set_biped(new_biped) -- Assing this new biped to tha spectator.
+    current_player.biped.set_hidden(true) -- Make this spectator invisible to everyone.
+    old_biped.delete() -- Delete the previous spectator's biped.
+
+    if client != no_player then -- If this spectator was succesfully initialized before.
+        client.biped.remove_weapon(primary, true) -- Remove it's primary weapon.
     end
 end
 
@@ -226,10 +272,6 @@ function handle_warning_hud()
     end
 end
 
-function crash_function()
-    crash_function()
-end
-
 function set_spectator_shape()
     spectator_shape = client.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
     spectator_shape.object[0] = client.biped
@@ -248,11 +290,16 @@ function handle_spectator_shape()
             altif current_object.is_of_type(frag_grenade) or current_object.is_of_type(plasma_grenade) then -- If the spectator get too close to any grenade.
                 penalize_spectator()
             end
+        end
+    end
 
-            if current_object.is_of_type(flag_stand) then
+    -- Necessary?
+    for each player do
+        if current_player != client and current_player.team != team[2] then -- If this player isn't the spectator.
+            if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player's biped.
                 penalize_spectator()
             end
-        end
+        end 
     end
 end
 
@@ -278,42 +325,20 @@ function handle_spectator()
     end
 end
 
-on local: do
-    for each player do
-        if current_player.team == team[2] then -- If this player is from green team.
-            if not current_player.biped.is_of_type(monitor) then -- If this player is not a monitor.
-                handle_spectator_conversion() -- Transform the player biped to a monitor.
-            altif current_player.biped.is_of_type(monitor) then -- If this player is a monitor.
-                if client == no_player then -- If the client doesn't exists.
-                    get_client() -- Get the client
-                altif client != no_player then -- If this client exists.
-                    if client.biped != no_object then -- If this spectator it's dead
-                        handle_spectator()
-                    end
-                end
-            end
-
-            if client != no_player and client == spectator_to_kick then -- If the client exists and it's equal to the spectator to kick.
-                crash_function() -- Crash this spectator game's
-            end
-        end
-    end
-
-    for each team do
-        if current_team == team[2] then -- If this team is the spectators team.
-            if current_team.has_any_players() then -- If this team has any players.
-                if current_team.score != -1 then -- If this team's score it's not minus one.
-                    current_team.score = -1 -- Set this team's score to minus one.
-                end
-            end
-        end
-    end
-end
-
 for each player do
     if current_player.team == team[2] then -- If this player is a spectator.
+        if not current_player.biped.is_of_type(monitor) then -- If this player is not a monitor.
+            handle_spectator_conversion() -- Transform the player biped to a monitor.
+        altif current_player.biped.is_of_type(monitor) then -- If this player is a monitor.
+            if client != no_player then -- If this client exists.
+                if client.biped != no_object then -- If this spectator it's dead
+                    handle_spectator()
+                end
+            end
+        end
+
         if current_player.number[4] >= 5 then -- If this spectator has committed five faults or more.
-            --spectator_to_kick = current_player -- Save this spectator to a variable.
+            spectator_to_kick = current_player -- Save this spectator to a variable.
         end
     end
 end
