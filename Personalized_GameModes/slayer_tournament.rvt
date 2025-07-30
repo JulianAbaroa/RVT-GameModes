@@ -1,0 +1,183 @@
+declare global.number[0] with network priority local
+declare global.number[1] with network priority local
+declare global.number[2] with network priority local
+declare global.number[3] with network priority local
+declare global.object[0] with network priority local
+declare global.player[0] with network priority local
+declare player.number[0] with network priority local
+declare player.number[1] with network priority low
+declare player.object[0] with network priority low
+declare player.timer[0] = 5
+
+-- VIP Red & Blue team
+
+declare player.number[2] with network priority low = 0 -- Flag: determines wether this player is allowed to be alive.
+
+for each player do
+    if current_player.team != team[2] then -- If this player isn't from the green team.
+        if current_player.number[2] == 0 then -- If this player isn't allowed to be alive.
+            if current_player.biped != no_object then
+                current_player.biped.kill(true) -- Kill this player's biped.
+            end
+        end
+    altif current_player.team == team[2] then -- If this player is from the green team.
+        alias current_weapon = allocate global.object
+        current_weapon = current_player.get_weapon(primary)
+
+        if current_weapon == no_object then -- If this player doesn't have a weapon.
+            current_player.biped.kill(true) -- Kill this player.
+        end
+
+        current_player.number[2] = 1 -- Flag: this player is allowed to be alive, even if they are on red/blue team.
+    end
+end
+
+-- VIP Red & Blue team
+
+if game.teams_enabled == 1 then 
+   for each object with label "ffa_only" do
+      current_object.delete()
+   end
+end
+
+if game.teams_enabled == 0 then 
+   for each object with label "team_only" do
+      current_object.delete()
+   end
+end
+
+on init: do
+end
+
+for each player do
+   if current_player.is_elite() then 
+      current_player.set_loadout_palette(elite_tier_1)
+   end
+   if not current_player.is_elite() then 
+      current_player.set_loadout_palette(spartan_tier_1)
+   end
+end
+
+for each player do
+   if game.score_to_win != 0 and game.teams_enabled == 1 then 
+      current_player.set_objective_text("Kill players on the enemy team.\r\n%n points to win.", game.score_to_win)
+   end
+   if game.score_to_win != 0 and game.teams_enabled == 0 then 
+      current_player.set_objective_text("Score points by killing other players.\r\n%n points to win.", game.score_to_win)
+   end
+   if game.score_to_win == 0 and game.teams_enabled == 1 then 
+      current_player.set_objective_text("Kill players on the enemy team.")
+   end
+   if game.score_to_win == 0 and game.teams_enabled == 0 then 
+      current_player.set_objective_text("Score points by killing other players.")
+   end
+end
+
+for each player do
+   current_player.timer[0].set_rate(-100%)
+   if current_player.number[1] == 0 and current_player.timer[0].is_zero() then 
+      if script_option[0] == 7 then 
+         send_incident(swat_game_start, current_player, no_player)
+      end
+      if not script_option[0] == 7 then 
+         send_incident(game_start_slayer, current_player, no_player)
+      end
+      current_player.number[1] = 1
+   end
+end
+
+for each player do
+   global.number[1] = 0
+   current_player.script_stat[0] = current_player.rating
+   current_player.number[0] = 0
+   if game.teams_enabled == 1 then 
+      global.number[1] = current_player.team.get_scoreboard_pos()
+   end
+   if game.teams_enabled == 0 then 
+      global.number[1] = current_player.get_scoreboard_pos()
+   end
+   if global.number[1] == 1 and not current_player.score == 0 then 
+      current_player.number[0] = 1
+   end
+end
+
+if script_option[0] == 3 or script_option[0] == 7 then 
+   for each object with label 1 do
+      current_object.delete()
+   end
+end
+
+for each player do
+   global.number[1] = 0
+   global.object[0] = current_player.biped
+   if global.object[0] != no_object then 
+      current_player.object[0] = global.object[0]
+   end
+   if current_player.killer_type_is(guardians | suicide | kill | betrayal | quit) then 
+      current_player.score += script_option[2]
+      if current_player.killer_type_is(kill) then 
+         global.player[0] = current_player.try_get_killer()
+         global.player[0].score += script_option[1]
+         do
+            global.number[2] = 0
+            global.number[3] = 0
+            global.number[3] = current_player.try_get_death_damage_type()
+            if global.number[3] == 6 then 
+               global.number[2] = current_player.object[0].get_distance_to(global.player[0].object[0])
+               if global.number[2] > 400 then 
+                  send_incident(dlc_achieve_5, global.player[0], current_player)
+               end
+            end
+         end
+         global.number[0] = current_player.try_get_death_damage_mod()
+         global.number[1] = global.player[0].get_spree_count()
+         do
+            global.number[1] %= 5
+            if global.number[1] == 0 then 
+               global.player[0].score += script_option[11]
+            end
+         end
+         if current_player.number[0] == 1 then 
+            global.player[0].score += script_option[5]
+         end
+         if global.number[0] == 1 then 
+            global.player[0].score += script_option[7]
+         end
+         if global.number[0] == 2 then 
+            global.player[0].score += script_option[8]
+         end
+         if global.number[0] == 3 then 
+            global.player[0].score += script_option[9]
+         end
+         if global.number[0] == 4 then 
+            global.player[0].score += script_option[10]
+         end
+         if global.number[0] == 5 then 
+            global.player[0].score += script_option[6]
+         end
+      end
+   end
+end
+
+for each player do
+   if current_player.killer_type_is(guardians | suicide | kill | betrayal | quit) and not current_player.killer_type_is(kill) and not current_player.killer_type_is(betrayal) then 
+      current_player.score += script_option[3]
+   end
+end
+
+for each player do
+   if current_player.killer_type_is(betrayal) then 
+      global.player[0] = current_player.try_get_killer()
+      global.player[0].score += script_option[4]
+   end
+end
+
+if game.round_time_limit > 0 and game.round_timer.is_zero() then 
+   game.end_round()
+end
+
+for each player do
+   if current_player.number[0] == 1 then 
+      current_player.apply_traits(script_traits[0])
+   end
+end

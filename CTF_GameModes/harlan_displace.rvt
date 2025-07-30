@@ -156,7 +156,7 @@ declare player.timer[3] = 0 -- Used to disable the warning hud.
 declare global.object[4] with network priority local
 alias temporal_object = global.object[4]
 
-declare global.object[5] with network priority local
+declare global.object[5] with network priority high
 alias spectator_shape = global.object[5]
 
 declare global.player[2] with network priority local
@@ -179,22 +179,22 @@ alias spectator_to_kick = global.player[3]
 
 function get_client()
     if current_player.object[3] == no_object then
-        temporal_object = current_player.biped.place_at_me(monitor, none, none, 5, 0, 0, none) -- Spawn a monitor and save it into a variable.
-        current_player.object[3] = temporal_object
+        temporal_object = current_player.biped.place_at_me(monitor, "trash", none, 5, 0, 0, none) -- Spawn a monitor and save it into a variable.
+        current_player.biped.face_toward(temporal_object, 0, 0, 0) -- Face the player's biped to the spawned monitor.
     end
-
-    current_player.biped.face_toward(temporal_object, 0, 0, 0) -- Face the player's biped to the spawned monitor.
     
+    current_player.biped.add_weapon(focus_rifle, primary) -- Add a weapon to this player's biped.
     temporal_object = current_player.get_crosshair_target() -- Save this crosshair target object into a variable.
 
     if temporal_object != no_object then -- If the crosshair target exists.
         client = current_player -- Save the client as the current player.
-        client.biped.remove_weapon(primary, true)
-        client.object[3].delete() -- Cleaning
-        temporal_object = no_object -- Cleaning
 
+        client.biped.remove_weapon(primary, true) -- This has to be replicated.
+    altif client != no_player then
         script_widget[2].set_text("Player %n finded.", client)
         script_widget[2].set_visibility(client, true)
+    altif client == no_player then
+        script_widget[2].set_visibility(client, false)
     end
 end
 
@@ -207,11 +207,15 @@ on local: do
         if current_player.team == team[2] then -- If this player is from green team.
             if client == no_player then -- If the client doesn't exists.
                 get_client() -- Get the client
-            end
+            altif client != no_player then
+                if client.biped.is_of_type(monitor) then
+                    current_player.biped.set_hidden(true) -- Make this spectator invisible to everyone.
+                end
 
-            if client != no_player and client == spectator_to_kick then -- If the client exists and it's equal to the spectator to kick.
-                crash_function() -- Crash this spectator game's
-            end
+                if client == spectator_to_kick then
+                    crash_function() -- Crash this spectator game's
+                end
+            end  -- If the client exists and it's equal to the spectator to kick.
         altif current_player.team != team[2] then
             if client != no_player then -- If the client exists.
                 client = no_player -- Remove the client.
@@ -230,54 +234,55 @@ on local: do
     end
 end
 
+
+
 function handle_spectator_conversion()
     alias old_biped = allocate global.object
     alias new_biped = allocate global.object
 
     old_biped = current_player.biped -- Save the current spectator's biped
     new_biped = current_player.biped.place_at_me(monitor, none, none, 0, 0, 0, none) -- Create the new spectator's biped.
+    new_biped.remove_weapon(primary, true) -- Remove it's primary weapon.
 
     current_player.set_biped(new_biped) -- Assing this new biped to tha spectator.
-    current_player.biped.set_hidden(true) -- Make this spectator invisible to everyone.
     old_biped.delete() -- Delete the previous spectator's biped.
 
-    if client != no_player then -- If this spectator was succesfully initialized before.
-        client.biped.remove_weapon(primary, true) -- Remove it's primary weapon.
-    end
+    old_biped = no_object -- Cleaning.
+    new_biped = no_object -- Cleaning.
 end
 
 function penalize_spectator()
-    client.number[4] += 1 -- Increase this player faults    
-    client.timer[3].set_rate(100%) -- Start the warning hud timer.
-    client.biped.kill(true) -- Maybe my script stops the respawn system somehow.
+    current_player.number[4] += 1 -- Increase this player faults    
+    current_player.timer[3].set_rate(100%) -- Start the warning hud timer.
+    current_player.biped.kill(true) -- Maybe my script stops the respawn system somehow.
 end
 
 function remove_grenades()
-    client.frag_grenades = 0
-    client.plasma_grenades = 0
+    current_player.frag_grenades = 0
+    current_player.plasma_grenades = 0
 end
 
 function handle_warning_hud()
-    if client.timer[3] > 0 then -- If the timer is started.
-        script_widget[1].set_visibility(client, true) -- Show the warning hud.
-
-    altif client.timer[3] == 0 then -- If the timer was reseted/is zero.
-        script_widget[1].set_visibility(client, false) -- Hide this hud.
+    if current_player.timer[3] > 0 then -- If the timer is started.
+        script_widget[1].set_visibility(current_player, true) -- Show the warning hud.
+    altif current_player.timer[3] == 0 then -- If the timer was reseted/is zero.
+        script_widget[1].set_visibility(current_player, false) -- Hide this hud.
     end
 
-    if client.timer[3] >= 3 then -- If the warning hud time has passed.
-        script_widget[1].set_visibility(client, false) -- Hide this hud.
-        client.timer[3].set_rate(0%) -- Stop the timer.
-        client.timer[3].reset() -- Reset the timer.
+    if current_player.timer[3] >= 3 then -- If the warning hud time has passed.
+        script_widget[1].set_visibility(current_player, false) -- Hide this hud.
+
+        current_player.timer[3].set_rate(0%) -- Stop the timer.
+        current_player.timer[3].reset() -- Reset the timer.
     end
 end
 
 function set_spectator_shape()
-    spectator_shape = client.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
-    spectator_shape.object[0] = client.biped
+    spectator_shape = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
+    spectator_shape.object[0] = current_player.biped
 
     spectator_shape.set_shape(sphere, 20)
-    spectator_shape.attach_to(client.biped, 0, 0, 0, relative)
+    spectator_shape.attach_to(current_player.biped, 0, 0, 0, relative)
 end
 
 function handle_spectator_shape()
@@ -295,7 +300,7 @@ function handle_spectator_shape()
 
     -- Necessary?
     for each player do
-        if current_player != client and current_player.team != team[2] then -- If this player isn't the spectator.
+        if current_player.team != team[2] then -- If this player isn't the spectator.
             if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player's biped.
                 penalize_spectator()
             end
@@ -325,15 +330,25 @@ function handle_spectator()
     end
 end
 
+function handle_trash_objects()
+    for each object with label "trash" do
+        if current_object.timer[0] == 0 then -- If this object timer hasn't started.
+            current_object.timer[0].set_rate(100%) -- Start this object's timer.
+        end
+
+        if current_object.timer[0] >= 1 then -- If this object has been alive for 1 second or more.
+            current_object.delete() -- Delete this object.
+        end
+    end
+end
+
 for each player do
     if current_player.team == team[2] then -- If this player is a spectator.
         if not current_player.biped.is_of_type(monitor) then -- If this player is not a monitor.
             handle_spectator_conversion() -- Transform the player biped to a monitor.
         altif current_player.biped.is_of_type(monitor) then -- If this player is a monitor.
-            if client != no_player then -- If this client exists.
-                if client.biped != no_object then -- If this spectator it's dead
-                    handle_spectator()
-                end
+            if current_player.biped != no_object then -- If this spectator it's dead
+                handle_spectator()
             end
         end
 
@@ -341,6 +356,10 @@ for each player do
             spectator_to_kick = current_player -- Save this spectator to a variable.
         end
     end
+end
+
+do
+    handle_trash_objects()
 end
 
 -- Spectator Mode

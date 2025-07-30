@@ -1,19 +1,20 @@
 declare player.number[0] with network priority low = 0 -- Flag: determines wether this player is allowed to be alive.
 
-on init: do
-    for each player do
-        if current_player.team == team[0] or current_player.team == team[1] then -- If this player is from red/blue team.
-            current_player.number[0] = 0 -- Flag: this player is not allowed to be alive.
-        end
-    end
-end
-
 for each player do
     if current_player.team != team[2] then -- If this player isn't from the green team.
         if current_player.number[0] == 0 then -- If this player isn't allowed to be alive.
-            current_player.biped.kill(true) -- Kill this player's biped.
+            if current_player.biped != no_object then
+                current_player.biped.kill(true) -- Kill this player's biped.
+            end
         end
     altif current_player.team == team[2] then -- If this player is from the green team.
+        alias current_weapon = allocate global.object
+        current_weapon = current_player.get_weapon(primary)
+
+        if current_weapon == no_object then -- If this player doesn't have a weapon.
+            current_player.biped.kill(true) -- Kill this player.
+        end
+
         current_player.number[0] = 1 -- Flag: this player is allowed to be alive, even if they are on red/blue team.
     end
 end
