@@ -150,7 +150,7 @@ end
 
 -- Spectator Mode
 
-declare player.number[4] -- Used to count the spectator faults.
+declare player.number[4] with network priority high -- Used to count the spectator faults.
 declare player.timer[3] = 0 -- Used to disable the warning hud.
 
 declare global.object[4] with network priority local
@@ -159,67 +159,14 @@ alias temporal_object = global.object[4]
 declare global.object[5] with network priority high
 alias spectator_shape = global.object[5]
 
-declare global.player[2] with network priority local
-alias client = global.player[2]
-
-declare global.player[3] with network priority low
-alias spectator_to_kick = global.player[3]
-
--- El monitor temporal no es removido
--- Al recoger un arma no se muere el espectador
--- Al acercarse a una bandera el monitor no muere
--- Al morir no se quita el arma primaria
--- Al volver a ser de un equipo, se quedan los estados del espectador
--- Al morir en este estado, luego respawneas bien
--- Creo que los estados se comparten a lo largo de todos los jugadores, debido al "on local"
--- Aparentemente el text de que cometiste un fault lo ven todos los jugadores. 
-
--- In local, nothing it's going to replicate to the other players.
--- On normal, all it's going to replicate to the players.
-
-function get_client()
-    if current_player.object[3] == no_object then
-        temporal_object = current_player.biped.place_at_me(monitor, "trash", none, 5, 0, 0, none) -- Spawn a monitor and save it into a variable.
-        current_player.biped.face_toward(temporal_object, 0, 0, 0) -- Face the player's biped to the spawned monitor.
-    end
-    
-    current_player.biped.add_weapon(focus_rifle, primary) -- Add a weapon to this player's biped.
-    temporal_object = current_player.get_crosshair_target() -- Save this crosshair target object into a variable.
-
-    if temporal_object != no_object then -- If the crosshair target exists.
-        client = current_player -- Save the client as the current player.
-
-        client.biped.remove_weapon(primary, true) -- This has to be replicated.
-    altif client != no_player then
-        script_widget[2].set_text("Player %n finded.", client)
-        script_widget[2].set_visibility(client, true)
-    altif client == no_player then
-        script_widget[2].set_visibility(client, false)
-    end
-end
-
-function crash_function()
-    --crash_function()
-end
-
 on local: do
     for each player do
-        if current_player.team == team[2] then -- If this player is from green team.
-            if client == no_player then -- If the client doesn't exists.
-                get_client() -- Get the client
-            altif client != no_player then
-                if client.biped.is_of_type(monitor) then
-                    current_player.biped.set_hidden(true) -- Make this spectator invisible to everyone.
-                end
-
-                if client == spectator_to_kick then
-                    crash_function() -- Crash this spectator game's
-                end
-            end  -- If the client exists and it's equal to the spectator to kick.
-        altif current_player.team != team[2] then
-            if client != no_player then -- If the client exists.
-                client = no_player -- Remove the client.
-            end
+        if current_player.biped != no_object then
+            if current_player.team == team[2] then
+                current_player.biped.set_hidden(true)
+            altif current_player.team != team[2] then
+                current_player.biped.set_hidden(false)
+            end    
         end
     end
 
@@ -234,8 +181,6 @@ on local: do
     end
 end
 
-
-
 function handle_spectator_conversion()
     alias old_biped = allocate global.object
     alias new_biped = allocate global.object
@@ -243,10 +188,10 @@ function handle_spectator_conversion()
     old_biped = current_player.biped -- Save the current spectator's biped
     new_biped = current_player.biped.place_at_me(monitor, none, none, 0, 0, 0, none) -- Create the new spectator's biped.
     new_biped.remove_weapon(primary, true) -- Remove it's primary weapon.
-
+    
     current_player.set_biped(new_biped) -- Assing this new biped to tha spectator.
     old_biped.delete() -- Delete the previous spectator's biped.
-
+    
     old_biped = no_object -- Cleaning.
     new_biped = no_object -- Cleaning.
 end
@@ -281,28 +226,27 @@ function set_spectator_shape()
     spectator_shape = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
     spectator_shape.object[0] = current_player.biped
 
-    spectator_shape.set_shape(sphere, 20)
+    spectator_shape.set_shape(sphere, 30)
+    spectator_shape.set_shape_visibility(everyone)
     spectator_shape.attach_to(current_player.biped, 0, 0, 0, relative)
 end
 
 function handle_spectator_shape()
-    for each object do
+    for each object with label "flag" do
         if spectator_shape.shape_contains(current_object) then
-            if current_object.is_of_type(flag) or current_object.is_of_type(bomb) or current_object.is_of_type(skull) then -- If the spectator get too close to a key object of the match.
-                penalize_spectator()
-            altif current_object.is_of_type(spartan) or current_object.is_of_type(elite) then -- If the spectator get too close to another player.
-                penalize_spectator()
-            altif current_object.is_of_type(frag_grenade) or current_object.is_of_type(plasma_grenade) then -- If the spectator get too close to any grenade.
-                penalize_spectator()
-            end
+            penalize_spectator()
         end
     end
 
-    -- Necessary?
+    alias spectator_player = allocate global.player
+    spectator_player = current_player
+
     for each player do
         if current_player.team != team[2] then -- If this player isn't the spectator.
             if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player's biped.
-                penalize_spectator()
+                spectator_player.number[4] += 1 -- Increase this player faults    
+                spectator_player.timer[3].set_rate(100%) -- Start the warning hud timer.
+                spectator_player.biped.kill(true) -- Maybe my script stops the respawn system somehow.
             end
         end 
     end
@@ -330,15 +274,10 @@ function handle_spectator()
     end
 end
 
-function handle_trash_objects()
-    for each object with label "trash" do
-        if current_object.timer[0] == 0 then -- If this object timer hasn't started.
-            current_object.timer[0].set_rate(100%) -- Start this object's timer.
-        end
-
-        if current_object.timer[0] >= 1 then -- If this object has been alive for 1 second or more.
-            current_object.delete() -- Delete this object.
-        end
+function activate_jail()
+    for each object with label "jail" do
+        current_player.biped.set_invincibility(1)
+        current_player.biped.attach_to(current_object, 0, 0, 0, relative)
     end
 end
 
@@ -353,13 +292,9 @@ for each player do
         end
 
         if current_player.number[4] >= 5 then -- If this spectator has committed five faults or more.
-            spectator_to_kick = current_player -- Save this spectator to a variable.
+            activate_jail()
         end
     end
-end
-
-do
-    handle_trash_objects()
 end
 
 -- Spectator Mode
@@ -904,100 +839,98 @@ function handle_flag_carrier_killed_incident()
 end
 
 -- Rework this again. (it seems it should spawn and despawn spawn zones, no activate or deactivate. Maybe even place spawnpoints, only one hill marker, that spawns 4 respawnpoints close to it)
--- And for the second primary zone on each base?
--- 
 function handle_flag_respawn_zones()
-    if current_team.has_any_players() then -- If this team has any players.
-        flag_or_biped_reference = current_team.object[1] -- Set the flag reference as the current team's flag.
-
-        if flag_or_biped_reference != no_object then -- If this team's flag exists.
-            alias flag_hill_marker = allocate global.object
-            flag_hill_marker = flag_or_biped_reference.object[0]
-
-            for each object with label "team_base" do
-                if current_object.team == current_team then
-                    if current_object.shape_contains(flag_hill_marker) then
-                        flag_hill_marker.number[0] = 0 -- flag on base.
-                    end
-                end
-            end
-
-            for each object with label "middle" do
-                if current_object.shape_contains(flag_hill_marker) then
-                    flag_hill_marker.number[0] = 1 -- flag on middle.
-                end
-            end
-
-            for each object with label "bottom" do
-                if current_object.shape_contains(flag_hill_marker) then
-                    flag_hill_marker.number[0] = 2 -- flag on bottom.
-                end
-            end
-
-            for each object with label "primary_res_zone" do
-                if current_object.team == current_team then -- If this respawn zone it's from the current team.
-                    current_object.enable_spawn_zone(0) -- Cleaning
-                    current_object.set_shape_visibility(no_one)
-                    current_object.set_invincibility(1)
-                    current_object.set_pickup_permissions(no_one)
-
-                    if flag_hill_marker.number[0] == 0 then -- If the flag is at base
-                        current_object.enable_spawn_zone(1)
-                    end
-                end
-
-                for each player do
-                    if current_object.shape_contains(current_player.biped) then
-                        if current_player.team != current_object.team then
-                            current_player.biped.kill(true)
-                        end
-                    end
-                end
-            end
-
-            for each object with label "secondary_res_zone" do
-                if current_object.team == current_team then
-                    current_object.enable_spawn_zone(0) -- Cleaning
-                    current_object.set_shape_visibility(no_one)
-                    current_object.set_invincibility(1)
-                    current_object.set_pickup_permissions(no_one)
-
-                    if flag_hill_marker.number[0] == 1 then -- If the flag is at middle.
-                        current_object.enable_spawn_zone(1)
-                    end
-                end
-
-                for each player do
-                    if current_object.shape_contains(current_player.biped) then
-                        if current_player.team != current_object.team then
-                            current_player.biped.kill(true)
-                        end
-                    end
-                end
-            end
-
-            for each object with label "tertiary_res_zone" do
-                if current_object.team == current_team then
-                    current_object.enable_spawn_zone(0) -- Cleaning
-                    current_object.set_shape_visibility(no_one)
-                    current_object.set_invincibility(1)
-                    current_object.set_pickup_permissions(no_one)
-
-                    if flag_hill_marker.number[0] == 2 then -- If the flag is at bottom.
-                        current_object.enable_spawn_zone(1)
-                    end
-                end
-
-                for each player do
-                    if current_object.shape_contains(current_player.biped) then
-                        if current_player.team != current_object.team then
-                            current_player.biped.kill(true)
-                        end
-                    end
-                end
-            end
-        end
-    end
+    --if current_team.has_any_players() then -- If this team has any players.
+    --    flag_or_biped_reference = current_team.object[1] -- Set the flag reference as the current team's flag.
+--
+    --    if flag_or_biped_reference != no_object then -- If this team's flag exists.
+    --        alias flag_hill_marker = allocate global.object
+    --        flag_hill_marker = flag_or_biped_reference.object[0]
+--
+    --        for each object with label "team_base" do
+    --            if current_object.team == current_team then
+    --                if current_object.shape_contains(flag_hill_marker) then
+    --                    flag_hill_marker.number[0] = 0 -- flag on base.
+    --                end
+    --            end
+    --        end
+--
+    --        for each object with label "middle" do
+    --            if current_object.shape_contains(flag_hill_marker) then
+    --                flag_hill_marker.number[0] = 1 -- flag on middle.
+    --            end
+    --        end
+--
+    --        for each object with label "bottom" do
+    --            if current_object.shape_contains(flag_hill_marker) then
+    --                flag_hill_marker.number[0] = 2 -- flag on bottom.
+    --            end
+    --        end
+--
+    --        for each object with label "primary_res_zone" do
+    --            if current_object.team == current_team then -- If this respawn zone it's from the current team.
+    --                current_object.enable_spawn_zone(0) -- Cleaning
+    --                current_object.set_shape_visibility(no_one)
+    --                current_object.set_invincibility(1)
+    --                current_object.set_pickup_permissions(no_one)
+--
+    --                if flag_hill_marker.number[0] == 0 then -- If the flag is at base
+    --                    current_object.enable_spawn_zone(1)
+    --                end
+    --            end
+--
+    --            for each player do
+    --                if current_object.shape_contains(current_player.biped) then
+    --                    if current_player.team != current_object.team then
+    --                        current_player.biped.kill(true)
+    --                    end
+    --                end
+    --            end
+    --        end
+--
+    --        for each object with label "secondary_res_zone" do
+    --            if current_object.team == current_team then
+    --                current_object.enable_spawn_zone(0) -- Cleaning
+    --                current_object.set_shape_visibility(no_one)
+    --                current_object.set_invincibility(1)
+    --                current_object.set_pickup_permissions(no_one)
+--
+    --                if flag_hill_marker.number[0] == 1 then -- If the flag is at middle.
+    --                    current_object.enable_spawn_zone(1)
+    --                end
+    --            end
+--
+    --            for each player do
+    --                if current_object.shape_contains(current_player.biped) then
+    --                    if current_player.team != current_object.team then
+    --                        current_player.biped.kill(true)
+    --                    end
+    --                end
+    --            end
+    --        end
+--
+    --        for each object with label "tertiary_res_zone" do
+    --            if current_object.team == current_team then
+    --                current_object.enable_spawn_zone(0) -- Cleaning
+    --                current_object.set_shape_visibility(no_one)
+    --                current_object.set_invincibility(1)
+    --                current_object.set_pickup_permissions(no_one)
+--
+    --                if flag_hill_marker.number[0] == 2 then -- If the flag is at bottom.
+    --                    current_object.enable_spawn_zone(1)
+    --                end
+    --            end
+--
+    --            for each player do
+    --                if current_object.shape_contains(current_player.biped) then
+    --                    if current_player.team != current_object.team then
+    --                        current_player.biped.kill(true)
+    --                    end
+    --                end
+    --            end
+    --        end
+    --    end
+    --end
 end
 
 function cleanup_flags_from_empty_teams()
@@ -1018,7 +951,7 @@ end
 function handle_teams()
     for each team do
         cleanup_flags_from_empty_teams()
-        handle_flag_respawn_zones()
+        --handle_flag_respawn_zones()
         handle_flag_states()
         set_flag_object()
         handle_modes()

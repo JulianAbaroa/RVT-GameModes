@@ -13,26 +13,174 @@ declare player.timer[0] = 5
 
 declare player.number[2] with network priority low = 0 -- Flag: determines wether this player is allowed to be alive.
 
-for each player do
-    if current_player.team != team[2] then -- If this player isn't from the green team.
-        if current_player.number[2] == 0 then -- If this player isn't allowed to be alive.
-            if current_player.biped != no_object then
-                current_player.biped.kill(true) -- Kill this player's biped.
+-- VIP Red & Blue team
+
+-- Spectator Mode
+
+declare player.number[3] with network priority high -- Used to count the spectator faults.
+declare player.timer[1] = 0 -- Used to disable the warning hud.
+
+declare global.object[1] with network priority local
+alias temporal_object = global.object[1]
+
+declare global.object[2] with network priority high
+alias spectator_shape = global.object[2]
+
+on local: do
+    for each player do
+        if current_player.biped != no_object then
+            if current_player.team == team[2] then
+                current_player.biped.set_hidden(true)
+            altif current_player.team != team[2] then
+                current_player.biped.set_hidden(false)
+            end    
+        end
+    end
+
+    for each team do
+        if current_team == team[2] then -- If this team is the spectators team.
+            if current_team.has_any_players() then -- If this team has any players.
+                if current_team.score != -1 then -- If this team's score it's not minus one.
+                    current_team.score = -1 -- Set this team's score to minus one.
+                end
             end
         end
-    altif current_player.team == team[2] then -- If this player is from the green team.
-        alias current_weapon = allocate global.object
-        current_weapon = current_player.get_weapon(primary)
-
-        if current_weapon == no_object then -- If this player doesn't have a weapon.
-            current_player.biped.kill(true) -- Kill this player.
-        end
-
-        current_player.number[2] = 1 -- Flag: this player is allowed to be alive, even if they are on red/blue team.
     end
 end
 
+function handle_spectator_conversion()
+    alias old_biped = allocate global.object
+    alias new_biped = allocate global.object
+
+    old_biped = current_player.biped -- Save the current spectator's biped
+    new_biped = current_player.biped.place_at_me(monitor, none, none, 0, 0, 0, none) -- Create the new spectator's biped.
+    new_biped.remove_weapon(primary, true) -- Remove it's primary weapon.
+    
+    current_player.set_biped(new_biped) -- Assing this new biped to tha spectator.
+    old_biped.delete() -- Delete the previous spectator's biped.
+    
+    old_biped = no_object -- Cleaning.
+    new_biped = no_object -- Cleaning.
+end
+
+function penalize_spectator()
+    current_player.number[3] += 1 -- Increase this player faults    
+    current_player.timer[1].set_rate(100%) -- Start the warning hud timer.
+    current_player.biped.kill(true) -- Maybe my script stops the respawn system somehow.
+end
+
+function remove_grenades()
+    current_player.frag_grenades = 0
+    current_player.plasma_grenades = 0
+end
+
+function handle_warning_hud()
+    if current_player.timer[1] > 0 then -- If the timer is started.
+        script_widget[0].set_visibility(current_player, true) -- Show the warning hud.
+    altif current_player.timer[1] == 0 then -- If the timer was reseted/is zero.
+        script_widget[0].set_visibility(current_player, false) -- Hide this hud.
+    end
+
+    if current_player.timer[1] >= 3 then -- If the warning hud time has passed.
+        script_widget[0].set_visibility(current_player, false) -- Hide this hud.
+
+        current_player.timer[1].set_rate(0%) -- Stop the timer.
+        current_player.timer[1].reset() -- Reset the timer.
+    end
+end
+
+function set_spectator_shape()
+    spectator_shape = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
+    spectator_shape.object[0] = current_player.biped
+
+    spectator_shape.set_shape(sphere, 30)
+    spectator_shape.set_shape_visibility(everyone)
+    spectator_shape.attach_to(current_player.biped, 0, 0, 0, relative)
+end
+
+function handle_spectator_shape()
+    alias spectator_player = allocate global.player
+    spectator_player = current_player
+
+    for each player do
+        if current_player.team != team[2] then -- If this player isn't the spectator.
+            if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player's biped.
+                spectator_player.number[3] += 1 -- Increase this player faults    
+                spectator_player.timer[1].set_rate(100%) -- Start the warning hud timer.
+                spectator_player.biped.kill(true) -- Maybe my script stops the respawn system somehow.
+            end
+        end 
+    end
+end
+
+function handle_spectator()
+    alias ability = allocate global.object
+    ability = current_player.get_armor_ability()
+
+    alias weapon = allocate global.object
+    weapon = current_player.get_weapon(primary)
+
+    if ability != no_object or weapon != no_object then -- If this player has a armor ability.
+        penalize_spectator() -- Apply the penalites to this spectator.
+    end
+
+    remove_grenades() -- Set this spectator grenades to zero.
+    handle_warning_hud() -- Handles when the warning hud should be enabled or disabled.
+
+    -- The spectators have to be killed if they get too close to players and to flags.
+    if spectator_shape == no_object then
+        set_spectator_shape()
+    altif spectator_shape != no_object then
+        handle_spectator_shape()
+    end
+end
+
+function activate_jail()
+    for each object with label "jail" do
+        current_player.biped.set_invincibility(1)
+        current_player.biped.attach_to(current_object, 0, 0, 0, relative)
+    end
+end
+
+for each player do
+   if current_player.team == team[2] then -- If this player is a spectator.
+
 -- VIP Red & Blue team
+
+      current_player.biped.set_invincibility(0)
+      current_player.number[2] = 1 -- Flag: this player is allowed to be alive, even if they are on red/blue team.
+
+-- VIP Red & Blue team
+
+      if not current_player.biped.is_of_type(monitor) then -- If this player is not a monitor.
+         handle_spectator_conversion() -- Transform the player biped to a monitor.
+      altif current_player.biped.is_of_type(monitor) then -- If this player is a monitor.
+         if current_player.biped != no_object then -- If this spectator it's dead
+            handle_spectator()
+         end
+      end
+
+      if current_player.number[3] >= 5 then -- If this spectator has committed five faults or more.
+         activate_jail()
+      end
+
+-- VIP Red & Blue team
+
+   altif current_player.team != team[2] then -- If this player isn't from the green team.
+      if current_player.number[2] == 0 then -- If this player isn't allowed to be alive.
+         if current_player.biped != no_object then -- If this player is alive.
+            current_player.frag_grenades = 0 -- Remove player's grenades.
+            current_player.biped.remove_weapon(primary, true) -- Remove this weapon.
+            activate_jail()
+         end
+      end
+   end
+
+-- VIP Red & Blue team
+
+end
+
+-- Spectator Mode
 
 if game.teams_enabled == 1 then 
    for each object with label "ffa_only" do

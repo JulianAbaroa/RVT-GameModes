@@ -4,7 +4,7 @@ for each player do
     if current_player.team != team[2] then -- If this player isn't from the green team.
         if current_player.number[0] == 0 then -- If this player isn't allowed to be alive.
             if current_player.biped != no_object then
-                current_player.biped.kill(true) -- Kill this player's biped.
+                current_player.biped.delete() -- Delete this player's biped.
             end
         end
     altif current_player.team == team[2] then -- If this player is from the green team.
