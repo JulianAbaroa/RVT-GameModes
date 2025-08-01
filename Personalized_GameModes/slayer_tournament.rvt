@@ -1,27 +1,54 @@
-declare global.number[0] with network priority local
-declare global.number[1] with network priority local
-declare global.number[2] with network priority local
-declare global.number[3] with network priority local
-declare global.object[0] with network priority local
-declare global.player[0] with network priority local
-declare player.number[0] with network priority local
-declare player.number[1] with network priority low
-declare player.object[0] with network priority low
-declare player.timer[0] = 5
+-- Tournament Configuration
 
--- VIP Red & Blue team
+declare global.timer[0] = 0
+alias await_timer = global.timer[0]
 
-declare player.number[2] with network priority low = 0 -- Flag: determines wether this player is allowed to be alive.
+function delete_initial_spawn_points()
+   for each object with label "init_spawn_point" do
+      current_object.delete()
+   end
+end
 
--- VIP Red & Blue team
+function create_initial_spawn_points()
+   for each object with label "create_init_spawn_point" do
+      if current_object.number[0] == 0 then -- If this object hasn't created a initial spawn point yet.
+         alias temporal_object = allocate global.object
 
--- Spectator Mode
+         if current_object.team == team[0] then -- If this object is from red team.
+            temporal_object = current_object.place_at_me(initial_spawn_point, none, none, 0, 0, 0, none) -- Create a initial spawn point on my position.
+            temporal_object.team = team[0] -- Set this initial spawn point to red team.
+         altif current_object.team == team[1] then -- If this object is from blue team.
+            temporal_object = current_object.place_at_me(initial_spawn_point, none, none, 0, 0, 0, none) -- Create a initial spawn point on my position.
+            temporal_object.team = team[1] -- Set this initial spawn point to blue team.
+         end
 
-declare player.number[3] with network priority high -- Used to count the spectator faults.
-declare player.timer[1] = 0 -- Used to disable the warning hud.
+         current_object.number[0] = 1 -- This object already created a initial spawn point.
+      end
+   end
+end
 
-declare global.object[1] with network priority local
-alias temporal_object = global.object[1]
+function set_invincible()
+   for each object with label "invincible" do
+      for each player do
+         if current_object.shape_contains(current_player.biped) then
+            current_player.biped.set_invincibility(1)
+         end
+      end
+   end
+end
+
+do
+   await_timer.set_rate(100%)
+
+   if await_timer >= 20 then
+      delete_initial_spawn_points()
+      create_initial_spawn_points()
+   end
+end
+
+-- Tournament Configuration
+
+-- Spectator Mode: If a specator faults, every spectator dies (not always, very weird), spectator don't die we it's close to a player
 
 declare global.object[2] with network priority high
 alias spectator_shape = global.object[2]
@@ -64,29 +91,12 @@ function handle_spectator_conversion()
 end
 
 function penalize_spectator()
-    current_player.number[3] += 1 -- Increase this player faults    
-    current_player.timer[1].set_rate(100%) -- Start the warning hud timer.
-    current_player.biped.kill(true) -- Maybe my script stops the respawn system somehow.
+   current_player.biped.delete() -- Should be local?
 end
 
 function remove_grenades()
-    current_player.frag_grenades = 0
-    current_player.plasma_grenades = 0
-end
-
-function handle_warning_hud()
-    if current_player.timer[1] > 0 then -- If the timer is started.
-        script_widget[0].set_visibility(current_player, true) -- Show the warning hud.
-    altif current_player.timer[1] == 0 then -- If the timer was reseted/is zero.
-        script_widget[0].set_visibility(current_player, false) -- Hide this hud.
-    end
-
-    if current_player.timer[1] >= 3 then -- If the warning hud time has passed.
-        script_widget[0].set_visibility(current_player, false) -- Hide this hud.
-
-        current_player.timer[1].set_rate(0%) -- Stop the timer.
-        current_player.timer[1].reset() -- Reset the timer.
-    end
+   current_player.frag_grenades = 0
+   current_player.plasma_grenades = 0
 end
 
 function set_spectator_shape()
@@ -99,88 +109,80 @@ function set_spectator_shape()
 end
 
 function handle_spectator_shape()
-    alias spectator_player = allocate global.player
-    spectator_player = current_player
-
-    for each player do
-        if current_player.team != team[2] then -- If this player isn't the spectator.
-            if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player's biped.
-                spectator_player.number[3] += 1 -- Increase this player faults    
-                spectator_player.timer[1].set_rate(100%) -- Start the warning hud timer.
-                spectator_player.biped.kill(true) -- Maybe my script stops the respawn system somehow.
-            end
-        end 
-    end
-end
-
-function handle_spectator()
-    alias ability = allocate global.object
-    ability = current_player.get_armor_ability()
-
-    alias weapon = allocate global.object
-    weapon = current_player.get_weapon(primary)
-
-    if ability != no_object or weapon != no_object then -- If this player has a armor ability.
-        penalize_spectator() -- Apply the penalites to this spectator.
-    end
-
-    remove_grenades() -- Set this spectator grenades to zero.
-    handle_warning_hud() -- Handles when the warning hud should be enabled or disabled.
-
-    -- The spectators have to be killed if they get too close to players and to flags.
-    if spectator_shape == no_object then
-        set_spectator_shape()
-    altif spectator_shape != no_object then
-        handle_spectator_shape()
-    end
-end
-
-function activate_jail()
-    for each object with label "jail" do
-        current_player.biped.set_invincibility(1)
-        current_player.biped.attach_to(current_object, 0, 0, 0, relative)
-    end
-end
-
-for each player do
-   if current_player.team == team[2] then -- If this player is a spectator.
-
--- VIP Red & Blue team
-
-      current_player.biped.set_invincibility(0)
-      current_player.number[2] = 1 -- Flag: this player is allowed to be alive, even if they are on red/blue team.
-
--- VIP Red & Blue team
-
-      if not current_player.biped.is_of_type(monitor) then -- If this player is not a monitor.
-         handle_spectator_conversion() -- Transform the player biped to a monitor.
-      altif current_player.biped.is_of_type(monitor) then -- If this player is a monitor.
-         if current_player.biped != no_object then -- If this spectator it's dead
-            handle_spectator()
-         end
-      end
-
-      if current_player.number[3] >= 5 then -- If this spectator has committed five faults or more.
-         activate_jail()
-      end
-
--- VIP Red & Blue team
-
-   altif current_player.team != team[2] then -- If this player isn't from the green team.
-      if current_player.number[2] == 0 then -- If this player isn't allowed to be alive.
-         if current_player.biped != no_object then -- If this player is alive.
-            current_player.frag_grenades = 0 -- Remove player's grenades.
-            current_player.biped.remove_weapon(primary, true) -- Remove this weapon.
-            activate_jail()
+   -- Test this.
+   for each object with label "spectator_shape" do
+      for each player do
+         if current_player.team != team[2] then -- If this player team is different from the spectator team.
+            if current_object.shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
+               current_object.object[0].delete() -- Kill this spectator.
+            end   
          end
       end
    end
 
--- VIP Red & Blue team
+   --alias spectator_player = allocate global.player
+   --spectator_player = current_player
 
+   --for each player do
+   --   if current_player.team != team[2] then -- If this player isn't the spectator.
+   --      if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player's biped.
+   --         spectator_player.biped.delete() -- Should be local?
+   --      end
+   --   end 
+   --end
+
+   for each object with label "weapon" do
+      if spectator_shape.shape_contains(current_object) then
+         penalize_spectator()
+      end
+   end
+end
+
+function handle_spectator()
+   alias ability = allocate global.object
+   ability = current_player.get_armor_ability()
+
+   alias weapon = allocate global.object
+   weapon = current_player.get_weapon(primary)
+
+   if ability != no_object or weapon != no_object then -- If this player has a armor ability.
+      penalize_spectator() -- Apply the penalites to this spectator.
+   end
+
+   remove_grenades() -- Set this spectator grenades to zero.
+
+   -- The spectators have to be killed if they get too close to players and to flags.
+   if spectator_shape == no_object then
+      set_spectator_shape()
+   altif spectator_shape != no_object then
+      handle_spectator_shape()
+   end
+end
+
+for each player do
+   if current_player.team == team[2] then -- If this player is a spectator.
+      if current_player.biped != no_object then -- If this player isn't dead.
+         if not current_player.biped.is_of_type(monitor) then -- If this player's biped is not a monitor.
+            handle_spectator_conversion() -- Transform the player biped to a monitor.
+         altif current_player.biped.is_of_type(monitor) then -- If this player's biped is a monitor.
+            handle_spectator()
+         end
+      end
+   end
 end
 
 -- Spectator Mode
+
+declare global.number[0] with network priority local
+declare global.number[1] with network priority local
+declare global.number[2] with network priority local
+declare global.number[3] with network priority local
+declare global.object[0] with network priority local
+declare global.player[0] with network priority local
+declare player.number[0] with network priority local
+declare player.number[1] with network priority low
+declare player.object[0] with network priority low
+declare player.timer[0] = 5
 
 if game.teams_enabled == 1 then 
    for each object with label "ffa_only" do

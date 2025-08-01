@@ -1,0 +1,33 @@
+-- Si este jugador es un luchador.
+-- Si este jugador es un espectador.
+
+for each object with label "respawn_zone" do
+    current_object.set_invincibility(1)
+    current_object.set_pickup_permissions(no_one)
+    current_object.set_spawn_location_permissions(allies) -- Only allies can spawn here. (players on the same fireteam)
+    
+    -- Hacer que solamente los jugadores del fireteam uno puedan spawnear aca.
+    if current_object.spawn_sequence == 0 then -- Flag: for fireteam zero
+        current_object.set_spawn_location_fireteams(0) -- Only the players on the fireteam zero can spawn here.
+    altif current_object.spawn_sequence == 1 then
+        current_object.set_spawn_location_fireteams(1)
+    altif current_object.spawn_sequence == 2 then
+        current_object.set_spawn_location_fireteams(2)
+    end
+
+   -- Borrer los initial spawn points de los equipos rojo y azul luego de que la partida inicia
+        
+    for each player do
+        if current_player.team == team[0] or current_player.team == team[1] then -- If this player is from red or blue team.
+            current_player.set_co_op_spawning(true) -- Activate this player co-op spawning.
+            current_player.set_fireteam(2) -- Set this player to the third fireteam.
+            
+            alias player_fireteam = allocate global.number
+            player_fireteam = current_player.get_fireteam()
+                
+            if player_fireteam == current_object.spawn_sequence and current_player.team == current_object.team then
+                current_player.set_primary_respawn_object(current_object) -- This player can spawn in this zone.
+            end
+        end
+    end
+end
