@@ -1,623 +1,849 @@
-declare global.number[0] with network priority local
-declare global.number[1] with network priority local
-declare global.number[2] with network priority low
-declare global.number[3] with network priority local
-declare global.number[4] with network priority local
-declare global.object[0] with network priority local
-declare global.object[1] with network priority local
-declare global.player[0] with network priority local
-declare global.player[1] with network priority local
-declare global.team[0] with network priority local
-declare player.number[0] with network priority low
-declare player.number[1] with network priority low
-declare player.timer[1] = 1
-declare player.timer[2] = 5
-declare object.number[0] with network priority low
-declare object.number[1] with network priority low = 1
-declare object.number[2] with network priority local
-declare object.number[3] with network priority local
-declare object.object[0] with network priority low
-declare object.player[0] with network priority low
-declare object.timer[0] = script_option[1]
-declare object.timer[1] = script_option[0]
-declare object.timer[2] = 3
-declare team.object[0] with network priority low
-declare team.object[1] with network priority low
-
--- ERROR PRINCIPAL EN EL DISEÑO: Equipo perdedor puede forzar el reseteo de las banderas, para que esta aparezca en el centro.
--- POSIBLE SOLUCION: Contar un pusheo fallido unicamente cuando ocurre una recupareción de bandera. (No contar cuando ocurre el reseteo de la bandera)
-
--- Modificaciones
+-- Flag Center Drop
 
 declare global.number[5] with network priority local = 0 -- Flag: Determina si el mapa es compatible con el modo de juego.
 alias map_is_compatible = global.number[5]
 
-declare global.number[6] with network priority local = 1 -- Flag: Bandera roja dentro de la base.
-declare global.number[7] with network priority local = 1 -- Flag: Bandera azul dentro de la base.
+declare global.number[6] with network priority local = 1 
+alias red_flag_on_base = global.number[6] -- Flag: Bandera roja dentro de la base.
 
-declare global.number[8] with network priority local = 0 -- Contador de veces que el equipo rojo a pusheado.
-declare global.number[9] with network priority local = 0 -- Contador de veces que el equipo azul a pusheado.
+declare global.number[7] with network priority local = 1 
+alias blue_flag_on_base = global.number[7] -- Flag: Bandera azul dentro de la base.
 
-declare global.timer[0] = 30 -- El timer de los rojos hace que la bandera de los azules vaya al centro.
-declare global.timer[1] = 30 -- El timer de los azules hace que la bandera roja vaya al centro.
+declare global.number[8] with network priority local = 0 
+alias red_pushes = global.number[8] -- Contador de veces que el equipo rojo a pusheado.
+
+declare global.number[9] with network priority local = 0 
+alias blue_pushes = global.number[9] -- Contador de veces que el equipo azul a pusheado.
+
+declare global.timer[0] = 30 
+alias blue_flag_drop_timer = global.timer[0] -- El timer de los rojos hace que la bandera de los azules vaya al centro.
+
+declare global.timer[1] = 30 
+alias red_flag_drop_timer = global.timer[1] -- El timer de los azules hace que la bandera roja vaya al centro.
 
 if map_is_compatible == 0 then -- Si el mapa no es compatible.
-   for each object with label "red_flag_center_spawn" do -- Si existe el objeto con esta label.
-      map_is_compatible = 1
-   end
+    for each object with label "red_flag_center_spawn" do -- Si existe el objeto con esta label.
+        map_is_compatible = 1
+    end
 
-   for each object with label "blue_flag_center_spawn" do -- Si existe el objeto con esta label.
-      map_is_compatible = 1
-   end
+    for each object with label "blue_flag_center_spawn" do -- Si existe el objeto con esta label.
+        map_is_compatible = 1
+    end
 
-   if map_is_compatible == 0 then -- Si no se encontraron objetos con las labels anteriores.
-      map_is_compatible = -1 -- El mapa se define como no compatible
-   end
+    if map_is_compatible == 0 then -- Si no se encontraron objetos con las labels anteriores.
+        map_is_compatible = -1 -- El mapa se define como no compatible
+    end
 end
 
 do
-   if map_is_compatible == 1 then -- Si el mapa es compatible con el modo de juego.
-      if global.number[8] >= 3 and team[0].score < team[1].score then -- Si los rojos han pusheado mas de 3 veces y además van perdiendo.
-         global.timer[0].set_rate(-100%) -- Disminuir el timer para que la bandera de los azules vaya al centro.
-      end
+    if map_is_compatible == 1 then -- Si el mapa es compatible con el modo de juego.
+        if red_pushes >= 2 and team[0].score < team[1].score then -- Si los rojos han pusheado mas de 3 veces y además van perdiendo.
+            blue_flag_drop_timer.set_rate(-100%) -- Disminuir el timer para que la bandera de los azules vaya al centro.
+        end
 
-      if global.number[9] >= 3 and team[0].score > team[1].score then -- Si los azules han pusehado más de tres veces y además van perdiendo.
-         global.timer[1].set_rate(-100%) -- Disminuir el timer para que la bandera de los rojos vaya al centro.
-      end
+        if blue_pushes >= 2 and team[0].score > team[1].score then -- Si los azules han pusehado más de tres veces y además van perdiendo.
+            red_flag_drop_timer.set_rate(-100%) -- Disminuir el timer para que la bandera de los rojos vaya al centro.
+        end
 
-      if global.timer[0] < 30 and global.number[8] >= 3 then -- Bandera azul apunto de irse al centro.
-         script_widget[1].set_text("Your flag on mid in %n", global.timer[0]) -- Widget arriba/izquierda. (Defensores)
-         script_widget[2].set_text("Enemy flag on mid in %n", global.timer[0]) -- Widget arribe/derecha. (Atacantes)
+        if blue_flag_drop_timer < 30 and red_pushes >= 2 then -- Bandera azul apunto de irse al centro.
+            script_widget[1].set_text("Your flag on mid in %n", blue_flag_drop_timer) -- Widget arriba/izquierda. (Defensores)
+            script_widget[2].set_text("Enemy flag on mid in %n", blue_flag_drop_timer) -- Widget arribe/derecha. (Atacantes)
 
-         for each player do -- Por cada jugador
-            if current_player.team == team[0] then -- Mostrar a los rojos que la bandera enemiga ira al centro.
-               script_widget[2].set_visibility(current_player, true)
-            altif current_player.team == team[1] then -- Mostrar a los azules que su bandera ira al centro.
-               script_widget[1].set_visibility(current_player, true)
+            for each player do -- Por cada jugador
+                if current_player.team == team[0] then -- Mostrar a los rojos que la bandera enemiga ira al centro.
+                script_widget[2].set_visibility(current_player, true)
+                altif current_player.team == team[1] then -- Mostrar a los azules que su bandera ira al centro.
+                script_widget[1].set_visibility(current_player, true)
+                end
             end
-         end
-      end
+        end
 
-      if global.timer[1] < 30 and global.number[9] >= 3 then -- Bandera roja apunto de irse al centro.
-         script_widget[1].set_text("Your flag on mid in %n", global.timer[1])
-         script_widget[2].set_text("Enemy flag on mid in %n", global.timer[1])
-         
-         for each player do
-            if current_player.team == team[0] then -- Mostrar a los rojos que su bandera ira al centro.
-               script_widget[1].set_visibility(current_player, true)
-            altif current_player.team == team[1] then -- Mostrar a los azules que la bandera enemiga ira al centro.
-               script_widget[2].set_visibility(current_player, true)
+        if red_flag_drop_timer < 30 and blue_pushes >= 2 then -- Bandera roja apunto de irse al centro.
+            script_widget[1].set_text("Your flag on mid in %n", red_flag_drop_timer)
+            script_widget[2].set_text("Enemy flag on mid in %n", red_flag_drop_timer)
+            
+            for each player do
+                if current_player.team == team[0] then -- Mostrar a los rojos que su bandera ira al centro.
+                script_widget[1].set_visibility(current_player, true)
+                altif current_player.team == team[1] then -- Mostrar a los azules que la bandera enemiga ira al centro.
+                script_widget[2].set_visibility(current_player, true)
+                end
             end
-         end
-      end
+        end
 
-      if global.timer[1] >= 30 or global.timer[1] <= 0 or global.number[6] == 0 then -- Si los azules no han pusheado.
-         for each player do
-            if current_player.team == team[0] then -- Si el jugador actual es del equipo rojo.
-               script_widget[1].set_visibility(current_player, false)
-            end
+        if red_flag_drop_timer >= 30 or red_flag_drop_timer <= 0 or red_flag_on_base == 0 then -- Si los azules no han pusheado.
+            for each player do
+                if current_player.team == team[0] then -- Si el jugador actual es del equipo rojo.
+                script_widget[1].set_visibility(current_player, false)
+                end
 
-            if current_player.team == team[1] then -- Si el jugador actual es del equipo azul.
-               script_widget[2].set_visibility(current_player, false)
+                if current_player.team == team[1] then -- Si el jugador actual es del equipo azul.
+                script_widget[2].set_visibility(current_player, false)
+                end
             end
-         end
-      end
+        end
 
-      if global.timer[0] >= 30 or global.timer[0] <= 0 or global.number[7] == 0 then -- Si los rojos no han pusheado.
-         for each player do
-            if current_player.team == team[0] then
-               script_widget[2].set_visibility(current_player, false) -- Widget arriba/izquierda. (Defensores)
-            end
+        if blue_flag_drop_timer >= 30 or blue_flag_drop_timer <= 0 or blue_flag_on_base == 0 then -- Si los rojos no han pusheado.
+            for each player do
+                if current_player.team == team[0] then
+                script_widget[2].set_visibility(current_player, false) -- Widget arriba/izquierda. (Defensores)
+                end
 
-            if current_player.team == team[1] then
-               script_widget[1].set_visibility(current_player, false) -- Widget arriba/derecha. (Atacantes)
+                if current_player.team == team[1] then
+                script_widget[1].set_visibility(current_player, false) -- Widget arriba/derecha. (Atacantes)
+                end
             end
-         end
-      end
-   end
+        end
+    end
 end
 
 for each team do -- Activar lógica principal.
    if map_is_compatible == 1 then
       if current_team == team[0] and team[0].score > team[1].score then -- Si es el equipo rojo.
-         if global.timer[1] <= 0 and global.number[6] == 1 and global.number[9] >= 3 then -- Si se sobrepaso el tiempo del equipo azul.
+         if red_flag_drop_timer <= 0 and red_flag_on_base == 1 and blue_pushes >= 2 then -- Si se sobrepaso el tiempo del equipo azul.
             current_team.object[1].delete() 
 
             for each object with label "red_flag_center_spawn" do
                current_object.place_at_me(flag, none, never_garbage_collect, 0, 0, 0, none)
             end
 
-            global.number[9] = -1 -- Reseteo del contador de pusheos para el equipo azul.
-            global.timer[1].reset()
+            blue_pushes = -1 -- Reseteo del contador de pusheos para el equipo azul.
+            red_flag_drop_timer.reset()
          end
       end
 
       if current_team == team[1] and team[0].score < team[1].score then
-         if global.timer[0] <= 0 and global.number[7] == 1 and global.number[8] >= 3 then
+         if blue_flag_drop_timer <= 0 and blue_flag_on_base == 1 and red_pushes >= 2 then
             current_team.object[1].delete() 
 
             for each object with label "blue_flag_center_spawn" do
                current_object.place_at_me(flag, none, never_garbage_collect, 0, 0, 0, none)
             end
 
-            global.number[8] = -1 -- Reseteo del contador de pusheos para el equipo rojo.
-            global.timer[0].reset()
+            red_pushes = -1 -- Reseteo del contador de pusheos para el equipo rojo.
+            blue_flag_drop_timer.reset()
          end
       end
    end
 end
 
--- Modificaciones
+-- Flag Center Drop
 
-do
-   global.number[0] = 0
-end
+
+
+
+
+
+-- Base code
+
+declare global.number[0] with network priority local 
+alias is_flag_being_carried = global.number[0] -- Flag: determines wether the flag is being carried or not.
+
+declare global.number[1] with network priority local 
+alias is_sudden_death_started = global.number[1] -- Flag: determines wether the suddent death has started or not.
+
+declare global.number[2] with network priority low 
+alias is_player_inside_flag_hill_marker = global.number[2] -- Flag: determines wether a player is inside the flag's hill marker shape. (only used in one-sided flag)
+
+declare global.number[3] with network priority local
+alias is_ready = global.number[3] -- Flag: one for yes, zero for no.
+
+declare global.number[4] with network priority local
+alias temporal_number_reference = global.number[4]  -- Used as a temporal number reference.
+
+declare global.object[0] with network priority local 
+alias flag_or_biped_reference = global.object[0] -- Temporal reference to any team's flag or any player's biped.
+
+declare global.object[1] with network priority local
+alias temporal_object_reference = global.object[1] -- Temporal reference to some objects used here.
+
+declare global.player[0] with network priority local 
+alias flag_carrier_killer = global.player[0] -- The flag carrier killer.
+
+declare global.player[1] with network priority local 
+alias flag_carrier = global.player[1] -- The player who is carrying the flag.
+
+declare global.team[0] with network priority local
+alias current_team_flag_carrier = global.team[0] -- Defines what it's the current team that's carrying the flag.
+
+declare player.number[0] with network priority low -- Flag: Determines wether the player has been initialized (zero for no, one for yes)
+declare player.number[1] with network priority low -- Flag: Determines wether the player is recovering the flag (zero for no, one for yes)
+
+declare player.timer[1] = 1 -- Used to increse the flag carry time of the flag carrier.
+declare player.timer[2] = 5 -- Used to give time to load everything before the player is initialized.
+
+declare object.number[0] with network priority low -- Flag: Used to determine the current flag state (carried, not carried, dropped, etc)
+declare object.number[1] with network priority low = 1 -- This is unused, at least here.
+declare object.number[2] with network priority local -- Flag: determines wether the flag is grabbed or not.
+declare object.number[3] with network priority local -- Flag: Determines wether the flag dropped incident have been sented.
+
+declare object.object[0] with network priority low -- The flag's hill marker.
+
+declare object.player[0] with network priority low -- The flag carrier of the current flag.
+
+declare object.timer[0] = script_option[1] -- Flag reset timer.
+declare object.timer[1] = script_option[0] -- Flag return timer.
+
+declare object.timer[2] = 3 -- Timer to allow the dropped/grabbed flag incidents to be send.
+
+declare team.object[0] with network priority low -- This is the object reference to the team's flag stand. 
+declare team.object[1] with network priority low -- This is the object reference to the team's flag.
 
 on pregame: do
    game.symmetry = 1
-   if script_option[2] == 1 then 
-      game.symmetry = 0
-   end
+   if script_option[2] == 1 then -- If one-sided it's enabled.
+    game.symmetry = 0
+    end
+end 
+
+-- Summary:
+-- Makes sure every player is able to select a loadout.
+function show_loadouts()
+    if current_player.is_spartan() then 
+        current_player.set_loadout_palette(spartan_tier_1)
+    end
+
+    if current_player.is_elite() then 
+        current_player.set_loadout_palette(elite_tier_1)
+    end
 end
 
-for each player do
-   if current_player.is_elite() then 
-      current_player.set_loadout_palette(elite_tier_1)
-   end
-   if not current_player.is_elite() then 
-      current_player.set_loadout_palette(spartan_tier_1)
-   end
+-- Summary:
+-- Makes sure every player is able to see the objectives.
+function initialize_objectives()
+    if script_option[2] == 1 then -- If one-sided flag it's enabled.
+        if current_player.team == team[0] then -- If the player its from red team.
+            current_player.set_objective_text("Defend your flag.\r\n%n rounds.", game.round_limit) -- Shows the objective, and the rounds quantity.
+            current_player.set_objective_allegiance_name("Defense") -- Shows the current role of the player team.
+            current_player.set_objective_allegiance_icon(defend) -- Shows the defend icon.
+        altif current_player.team == team[1] then -- If the player its from blue team.
+            current_player.set_objective_text("Capture the enemy flag.\r\n%n rounds.", game.round_limit) -- Shows the objective, and the rounds quantity.
+            current_player.set_objective_allegiance_name("Offense") -- Shows the current role of the player team.
+            current_player.set_objective_allegiance_icon(attack) -- Shows the attack icon.
+        end
+    end
+
+    if game.score_to_win != 0 then -- If the score to win it's different from zero.
+        if script_option[2] == 0 or script_option[2] == 2 then -- If multi or neutral flag its selected.
+            current_player.set_objective_text("Capture the flag.\r\n%n points to win.", game.score_to_win) -- Shows the objective, and the score to win.
+        end
+    altif game.score_to_win == 0 then -- If the score to win it's equal to zero.
+        if script_option[2] == 0 or script_option[2] == 2 then -- If multi or neutral flag its enabled.
+            current_player.set_objective_text("Capture the flag.") -- Shows the objective.
+        end 
+    end
 end
 
-for each player do
-   current_player.timer[2].set_rate(-100%)
-   if script_option[2] == 1 and current_player.team == team[1] then 
-      current_player.set_objective_text("Capture the enemy flag.\r\n%n rounds.", game.round_limit)
-      current_player.set_objective_allegiance_name("Offense")
-      current_player.set_objective_allegiance_icon(attack)
-   end
-   if script_option[2] == 1 and current_player.team == team[0] then 
-      current_player.set_objective_text("Defend your flag.\r\n%n rounds.", game.round_limit)
-      current_player.set_objective_allegiance_name("Defense")
-      current_player.set_objective_allegiance_icon(defend)
-   end
-   if game.score_to_win != 0 and script_option[2] == 2 or script_option[2] == 0 then 
-      current_player.set_objective_text("Capture the flag.\r\n%n points to win.", game.score_to_win)
-   end
-   if game.score_to_win == 0 and script_option[2] == 2 or script_option[2] == 0 then 
-      current_player.set_objective_text("Capture the flag.")
-   end
-end
+-- Summary:
+-- 
+function initialize_players()
+    -- Initialize players hud. 
+    script_widget[0].set_text("Your flag must be at home to score!")
+    script_widget[0].set_visibility(current_player, false)
+    current_player.biped.set_waypoint_icon(none)
 
-for each player do
-   script_widget[0].set_text("Your flag must be at home to score!")
-   script_widget[0].set_visibility(current_player, false)
-   if current_player.number[0] == 0 and current_player.timer[2].is_zero() then 
-      send_incident(ctf_game_start, current_player, no_player)
-      current_player.number[0] = 1
-      if script_option[2] == 1 and current_player.team == team[1] then 
-         send_incident(team_offense, current_player, no_player)
-      end
-      if script_option[2] == 1 and current_player.team == team[0] then 
-         send_incident(team_defense, current_player, no_player)
-      end
-   end
-end
+    -- Initialize players roles.
+    current_player.timer[2].set_rate(-100%) -- Decrese the timer to initialize the player.
 
-for each team do
-   if current_team.object[0] == no_object then 
-      for each object with label "ctf_flag_return" do
-         if current_team.object[0] == no_object and current_object.team == current_team then 
-            current_team.object[0] = current_object
-            current_object.set_waypoint_visibility(allies)
-            current_object.set_waypoint_icon(diamond)
-         end
-      end
-   end
-end
+    if current_player.number[0] == 0 then -- If this player hasn't been initialized.
+        if current_player.timer[2].is_zero() then -- If the determined time has passed.
+            send_incident(ctf_game_start, current_player, no_player) -- Notify the game engine that the ctf has started for this player.
+            current_player.number[0] = 1 -- Flag: The player has been initialized.
 
-for each team do
-   current_team.object[1].set_waypoint_visibility(everyone)
-   if current_team == neutral_team or current_team.has_any_players() and current_team.object[1] == no_object and not current_team.object[0] == no_object then 
-      global.number[3] = 0
-      if script_option[2] == 0 and not current_team == neutral_team and current_team.has_any_players() then 
-         global.number[3] = 1
-      end
-      if script_option[2] == 1 and current_team == team[0] then 
-         team[1].object[0].set_waypoint_visibility(everyone)
-         team[0].object[0].set_waypoint_visibility(no_one)
-         global.number[3] = 1
-      end
-      if script_option[2] == 2 and current_team == neutral_team then 
-         global.number[3] = 1
-      end
-      if global.number[3] == 1 then 
-         if script_option[2] == 1 or script_option[2] == 2 then 
-            for each object do
-               if current_object.is_of_type(flag) then 
-                  current_team.object[1] = current_object
-                  global.number[3] = 0
-               end
+            if script_option[2] == 1 then -- If one-side flag its enabled.
+                if current_player.team == team[0] then -- If the player its from red team.
+                    send_incident(team_defense, current_player, no_player) -- Notify the game engine that this player is on the defense team.
+                altif current_player.team == team[1] then -- If the player its from blue team.
+                    send_incident(team_offense, current_player, no_player) -- Notify the game engine that this player is on the offense team.
+                end
             end
-         end
-         if script_option[2] == 0 then 
-            for each object do
-               if current_object.is_of_type(flag) and global.number[3] == 1 then 
-                  global.number[4] = 1
-                  do
-                     global.player[1] = no_player
-                     global.player[1] = current_object.get_carrier()
-                     if not global.player[1] == no_player and global.player[1].team == current_team then 
-                        global.number[4] = 0
-                     end
-                  end
-                  for each team do
-                     if current_team.object[1] == current_object then 
-                        global.number[4] = 0
-                     end
-                  end
-                  if global.number[4] == 1 then 
-                     current_team.object[1] = current_object
-                     global.number[3] = 0
-                  end
-               end
-            end
-         end
-         if global.number[3] == 1 then 
-            current_team.object[1] = current_team.object[0].place_at_me(flag, none, never_garbage_collect, 0, 0, 3, none)
-         end
-         global.object[0] = current_team.object[1]
-         if global.number[3] == 0 then 
-            global.object[0].number[0] = 1
-         end
-         global.object[0].team = current_team
-         current_team.object[1].set_pickup_permissions(enemies)
-         current_team.object[1].set_weapon_pickup_priority(high)
-         current_team.object[1].set_waypoint_icon(flag)
-         current_team.object[1].set_waypoint_priority(high)
-         global.object[0].set_shape(cylinder, 7, 6, 3)
-         if script_option[2] == 2 then 
-            current_team.object[1].set_pickup_permissions(everyone)
-         end
-      end
-   end
+        end
+    end
 end
 
-for each player do
-   current_player.biped.set_waypoint_icon(none)
+function handle_cooldown_traits()
+    flag_or_biped_reference = current_player.biped
+    
+    if flag_or_biped_reference != no_object then -- If the biped is valid.
+        temporal_object_reference = no_object -- Cleaning.
+        temporal_object_reference = current_player.get_weapon(primary)
+            
+        if not temporal_object_reference.is_of_type(flag) then -- If the biped is not holding a flag.
+            if current_player.timer[0] > 0 then -- If the timer to apply cooldown traits is higher than zero.
+                current_player.timer[0].set_rate(-100%) -- Decrease the timer to zero.
+
+                if not current_player.timer[0].is_zero() then -- If the timer to apply cooldown traits is not zero.
+                    current_player.apply_traits(script_traits[1]) -- Apply cooldown traits.
+                end
+            end
+        end
+    end
 end
 
-for each team do
-   global.object[0] = current_team.object[1]
-   global.player[1] = no_player
-   global.number[2] = 0
-   global.player[1] = global.object[0].get_carrier()
-   if not global.player[1] == no_player then 
-      global.object[0].player[0] = global.player[1]
-      global.player[1].apply_traits(script_traits[0])
-      global.player[1].timer[1].set_rate(-100%)
-      if global.player[1].timer[1].is_zero() then 
-         global.player[1].script_stat[1] += 1
-         global.player[1].timer[1].reset()
-      end
-   end
-   if not global.player[1] == no_player then -- Si la bandera contiene un jugador válido (flag-carrier)
-      global.object[0].set_waypoint_visibility(no_one)
-      global.player[1].biped.set_waypoint_icon(flag)
-      global.object[0].number[0] = 1
-      global.object[0].timer[0] = script_option[1]
-      global.object[0].timer[1] = script_option[0]
-      global.object[0].set_progress_bar(0, no_one)
-      global.number[0] = 1
-      global.player[1].timer[0] = script_option[4]
-      global.team[0] = global.player[1].team
+-- Summary:
+-- 
+function handle_players()
+    for each player do
+        show_loadouts()
+        initialize_players()
+        initialize_objectives()
+        handle_cooldown_traits()
+    end
+end
 
--- Modificación ¿Que condición hara que entre una sola vez?
-      if map_is_compatible == 1 then
-         if current_team == team[0] then
-            global.number[6] = 0 -- La bandera roja esta siendo llevada
-         end
+-- Summary:
+-- 
+function set_flag_object()
+    current_team.object[1].set_waypoint_visibility(everyone) -- Sets the current flag waypoint visible to everyone.
 
-         if current_team == team[1] then
-            global.number[7] = 0 -- La bandera azul esta siendo llevada
-         end
-      end
-
--- Modificación
-
-      if global.team[0].object[0].shape_contains(global.player[1].biped) then -- Si el jugador esta dentro de la shape de su propio "flag_stand"
-         global.number[3] = 1
-         script_widget[0].set_visibility(global.player[1], false)
-         if script_option[3] == 1 and script_option[2] == 0 then 
-            global.object[1] = global.team[0].object[1]
-            if not global.object[1].number[0] == 0 then 
-               global.number[3] = 0
-               script_widget[0].set_visibility(global.player[1], true)
+    if current_team.object[0] == no_object then -- If this team doesn't have referenced a flag.
+        for each object with label "ctf_flag_return" do -- Foreach flag stand.
+            if current_object.team == current_team then -- If the current object team is equal to the current team.
+                current_team.object[0] = current_object -- The referenced team flag is the current object.
+                current_object.set_waypoint_visibility(allies) -- Shows its waypoint only to the allies players.
+                current_object.set_waypoint_icon(diamond) -- Defines the waypoint icon to diamond.
             end
-         end
-         if global.number[3] == 1 then -- Pase todas las validaciones y puedo efectivamente puntuar.
-            global.player[1].score += 1
-            global.player[1].script_stat[0] += 1
+        end
+    end
+end
 
--- Modificación (Resetear el timer segun el equipo en cuestión)
+-- Summary:
+-- 
+function handle_modes()
+    if current_team == neutral_team or current_team.has_any_players() then
+        if current_team.object[1] == no_object then -- If this team doesn't have a flag.
+            if current_team.object[0] != no_object then -- If this does have a flag stand.
+                is_ready = 0 
+                
+                if script_option[2] == 0 then -- If it's multi-flag.
+                    if current_team != neutral_team then
+                        is_ready = 1
+                    end
+                altif script_option[2] == 1 then -- If it's one-side flag.
+                    if current_team == team[0] then
+                        team[1].object[0].set_waypoint_visibility(everyone)
+                        team[0].object[0].set_waypoint_visibility(no_one)
+                        is_ready = 1
+                    end
+                altif script_option[2] == 2 then -- If it's neutral flag.
+                    if current_team == neutral_team then
+                        is_ready = 1
+                    end
+                end
+
+                if is_ready == 1 then 
+                    if script_option[2] == 1 or script_option[2] == 2 then -- If it's one-side or neutral flag.
+                        for each object do
+                            if current_object.is_of_type(flag) then 
+                                current_team.object[1] = current_object -- Set this flag to the current team.
+                                is_ready = 0
+                            end
+                        end
+                    altif script_option[2] == 0 then -- If it's multi-flag.
+                        for each object do
+                            if current_object.is_of_type(flag) then
+                                if is_ready == 1 then
+                                    temporal_number_reference = 1 -- Flag finded.
+
+                                    do
+                                        flag_carrier = no_player
+                                        flag_carrier = current_object.get_carrier()
+                                        
+                                        if flag_carrier != no_player then
+                                            if flag_carrier.team == current_team then
+                                                temporal_number_reference = 0 -- A player of this team is carrying a flag.
+                                            end
+                                        end 
+                                    end
+
+                                    for each team do
+                                        if current_team.object[1] == current_object then 
+                                            temporal_number_reference = 0 -- Flag finded.
+                                        end
+                                    end
+
+                                    if temporal_number_reference == 1 then -- If no one is carrying the flag or the foreach works?
+                                        current_team.object[1] = current_object
+                                        is_ready = 0
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if is_ready == 1 then
+                        -- Create and assing a new flag.
+                        current_team.object[1] = current_team.object[0].place_at_me(flag, none, never_garbage_collect, 0, 0, 3, none)
+                    end
+
+                    flag_or_biped_reference = current_team.object[1]
+
+                    if is_ready == 0 then 
+                        flag_or_biped_reference.number[0] = 1 -- The flag was carried.
+                    end
+
+                    flag_or_biped_reference.team = current_team
+
+                    current_team.object[1].set_pickup_permissions(enemies)
+                    current_team.object[1].set_weapon_pickup_priority(high)
+                    current_team.object[1].set_waypoint_icon(flag)
+                    current_team.object[1].set_waypoint_priority(high)
+
+                    flag_or_biped_reference.set_shape(cylinder, 7, 6, 3)
+
+                    if script_option[2] == 2 then 
+                        current_team.object[1].set_pickup_permissions(everyone)
+                    end
+                end
+            end
+        end
+    end
+end
+
+function handle_flag_being_carried() 
+    flag_or_biped_reference.player[0] = flag_carrier -- Sets the flag carrier to the flag reference.
+        
+    flag_carrier.timer[1].set_rate(-100%) -- Flag carrier timer decreasing.
+    flag_carrier.apply_traits(script_traits[0]) -- Flag carrier traits applied.
+
+    if flag_carrier.timer[1].is_zero() then 
+        flag_carrier.script_stat[1] += 1 -- Increases the flag carry time of the flag carrier.
+        flag_carrier.timer[1].reset()
+    end
+
+    flag_or_biped_reference.set_waypoint_visibility(no_one) -- Hides the flag waypoint.
+    flag_carrier.biped.set_waypoint_icon(flag) -- Set a waypoint to the flag carrier biped.
+
+    flag_or_biped_reference.number[0] = 1 -- The flag was carried.
+
+    flag_or_biped_reference.timer[0] = script_option[1] -- Defines the reset time to the flag.
+    flag_or_biped_reference.timer[1] = script_option[0] -- Defines the return time to the flag.
+
+    flag_or_biped_reference.set_progress_bar(0, no_one) -- Enables a progress bar to the flag.
+
+    is_flag_being_carried = 1 -- Flag is being carried.
+
+    flag_carrier.timer[0] = script_option[4] -- Defines the flag carrier cooldown.
+
+    current_team_flag_carrier = flag_carrier.team -- Defines the team that's carrying the flag.
+
+-- Flag Center Drop
+
+    if map_is_compatible == 1 then
+        if current_team == team[0] then
+           red_flag_on_base = 0 -- La bandera roja esta siendo llevada
+        end
+
+        if current_team == team[1] then
+           blue_flag_on_base = 0 -- La bandera azul esta siendo llevada
+        end
+    end
+
+-- Flag Center Drop
+
+    -- If the flag carrier biped it's inside of the flag stand shape.
+    if current_team_flag_carrier.object[0].shape_contains(flag_carrier.biped) then 
+        is_ready = 1
+
+        script_widget[0].set_visibility(flag_carrier, false)
+
+        if script_option[3] == 1 then -- If the flag at home to score option is enabled.
+            if script_option[2] == 0 then -- If it's multi-flag.
+                temporal_object_reference = current_team_flag_carrier.object[1] -- Set the red team's flag as a temporal object reference.
+
+                if temporal_object_reference.number[0] != 0 then -- If this team has not their flag at home.
+                    is_ready = 0
+                    script_widget[0].set_visibility(flag_carrier, true) -- Show flag must be at home message.
+                end
+            end
+        end
+
+        if is_ready == 1 then
+            flag_carrier.score += 1 -- Add score to the flag carrier.
+            flag_carrier.script_stat[0] += 1 -- Add score to the flag captures.
+
+-- Flag Center Drop 
 
             if map_is_compatible == 1 then
-               if current_team == team[0] then -- Si es el equipo rojo.
-                  global.timer[1].reset() -- Se resetea el timer del equipo azul.
-                  global.number[6] = 1 -- La bandera roja esta en su base.
-                  global.number[9] = 0 -- El contador de pusheos del equipo azul se resetea.
-               end
-                  
-               if current_team == team[1] then -- Si es el equipo azul.
-                  global.timer[0].reset() -- Se resetea el timer del equipo rojo.
-                  global.number[7] = 1 -- La bandera azul esta en su base.
-                  global.number[8] = 0 -- El contador de pusheos del equipo rojo se resetea.
-               end
+                if current_team == team[0] then -- Si es el equipo rojo.
+                    red_flag_drop_timer.reset() -- Se resetea el timer del equipo azul.
+                    red_flag_on_base = 1 -- La bandera roja esta en su base.
+                    blue_pushes = 0 -- El contador de pusheos del equipo azul se resetea.
+                end
+                    
+                if current_team == team[1] then -- Si es el equipo azul.
+                    blue_flag_drop_timer.reset() -- Se resetea el timer del equipo rojo.
+                    blue_flag_on_base = 1 -- La bandera azul esta en su base.
+                    red_pushes = 0 -- El contador de pusheos del equipo rojo se resetea.
+                end
             end
--- Modificación
-            current_team.object[1].delete()
-            send_incident(flag_scored, global.player[1], all_players)
-         end
-      end
-   end
-   if global.player[1] == no_player and global.object[0].number[0] == 1 then 
-      global.object[0].number[0] = 2
-      if script_option[0] != 1 then 
-         global.object[0].set_progress_bar(1, allies)
-      end
-      global.object[0].set_waypoint_icon(flag)
-      global.object[0].set_waypoint_visibility(everyone)
-      current_team.object[1].set_waypoint_priority(high)
-   end
+
+-- Flag Center Drop
+
+            current_team.object[1].delete() -- Delete the flag scored.
+            send_incident(flag_scored, flag_carrier, all_players)
+        end
+    end
 end
 
-for each team do
-   global.object[0] = current_team.object[1]
-   if not global.object[0] == no_object and global.object[0].number[0] == 2 or global.object[0].number[0] == 3 then 
-      global.object[0].timer[0].set_rate(-100%)
-      global.object[0].timer[1].set_rate(100%)
-      for each player do
-         current_player.number[1] = 0
-         if current_player.team == current_team and global.object[0].shape_contains(current_player.biped) then 
-            current_player.number[1] = 1
-            global.object[0].timer[1].set_rate(-100%)
-            if script_option[0] == 1 then 
-               global.object[0].timer[1].set_rate(-1000%)
-            end
-            global.object[0].set_waypoint_priority(blink)
-         end
-      end
-      for each object with label 5 do
-         if current_object.timer[0] < 6 then 
-            current_object.set_waypoint_priority(blink)
-         end
-      end
-      if global.object[0].is_out_of_bounds() or global.object[0].timer[0].is_zero() then 
-         global.object[0].delete()
-         if script_option[2] == 2 then 
-            send_incident(flag_reset_neutral, global.object[0].player[0], current_team)
-         end
-         if not script_option[2] == 2 then 
+function handle_flag_reset()
+    flag_or_biped_reference.delete()
 
--- Modificación
+    if script_option[2] == 2 then -- If is neutral flag.
+        send_incident(flag_reset_neutral, flag_or_biped_reference.player[0], current_team)
+    altif script_option[2] != 2 then -- If is multi-flag or one-side flag.
+
+-- Flag Center Drop
 
             if map_is_compatible == 1 then
-               if current_team == team[0] then -- Si es el equipo rojo.
-                  global.timer[1].reset() -- Se resetea el timer del equipo azul.
-                  global.number[6] = 1 -- La bandera roja esta en su base.
-                  global.number[9] += 1 -- Se incrementa el contador de pusheos del equipo azul.
-               end
+                if current_team == team[0] then -- Si es el equipo rojo.
+                    red_flag_drop_timer.reset() -- Se resetea el timer del equipo azul.
+                    red_flag_on_base = 1 -- La bandera roja esta en su base.
+                end
 
-               if current_team == team[1] then
-                  global.timer[0].reset() -- Se resetea el timer del equipo rojo.
-                  global.number[7] = 1 -- La bandera azul esta en su base.
-                  global.number[8] += 1 -- Se incrementa el contador de pusheos del equipo rojo.
-               end
+                if current_team == team[1] then
+                    blue_flag_drop_timer.reset() -- Se resetea el timer del equipo rojo.
+                    blue_flag_on_base = 1 -- La bandera azul esta en su base.
+                end
             end
 
--- Modificación
+-- Flag Center Drop
 
-            send_incident(flag_reset, current_team, current_team)
-         end
-      end
-      if global.object[0].timer[1].is_zero() then 
-         global.object[0].delete()
+        send_incident(flag_reset, current_team, current_team)
+    end
+end
 
--- Modificación
+function handle_flag_recover()
+    flag_or_biped_reference.delete()
+
+-- Flag Center Drop
 
          if map_is_compatible == 1 then
             if current_team == team[0] then -- Si es el equipo rojo.
-               global.timer[1].reset() -- Se resetea el timer del equipo azul.
-               global.number[6] = 1 -- La bandera roja esta en su base.
-               global.number[9] += 1 -- Se incrementa el contador de pusheos del equipo azul.
+               red_flag_drop_timer.reset() -- Se resetea el timer del equipo azul.
+               red_flag_on_base = 1 -- La bandera roja esta en su base.
+               blue_pushes += 1 -- Se incrementa el contador de pusheos del equipo azul.
             end
 
             if current_team == team[1] then -- Si es el equipo azul.
-               global.timer[0].reset() -- Se resetea el timer del equipo rojo.
-               global.number[7] = 1 -- La bandera azul esta en su base.
-               global.number[8] += 1 -- Se incrementa el contador de pusheos del equipo rojo.
+               blue_flag_drop_timer.reset() -- Se resetea el timer del equipo rojo.
+               blue_flag_on_base = 1 -- La bandera azul esta en su base.
+               red_pushes += 1 -- Se incrementa el contador de pusheos del equipo rojo.
             end
          end
 
--- Modificación
+-- Flag Center Drop
 
-         send_incident(flag_recovered, current_team, current_team)
-         for each player do
-            if current_player.number[1] == 1 and current_player.team == current_team then 
-               current_player.script_stat[2] += 1
-               current_player.number[1] = 0
+    send_incident(flag_recovered, current_team, current_team)
+
+    for each player do
+        if current_player.number[1] == 1 then -- If this player was recovering the flag.
+            if current_player.team == current_team then -- If this player team is the same as the current team.
+                current_player.script_stat[2] += 1 -- Increase the flags returned in one for this player.
+                current_player.number[1] = 0 -- This player is not returning a flag anymore.
             end
-         end
-      end
-   end
+        end
+    end
 end
 
-for each team do
-   global.object[0] = current_team.object[1]
-   global.object[1] = global.object[0].player[0].biped
-   global.player[1] = global.object[0].player[0]
-   global.object[0].timer[2].set_rate(-100%)
-   if global.object[0].timer[2].is_zero() then 
-      if global.object[0].number[0] == 2 and global.object[0].number[3] != 1 then 
-         global.object[0].number[3] = 1
-         if script_option[2] == 2 then 
-            send_incident(flag_dropped_neutral, global.object[0].player[0], current_team)
-         end
-         if not script_option[2] == 2 then 
-            send_incident(flag_dropped, global.object[0].player[0], current_team)
-         end
-         global.object[0].timer[2].reset()
-      end
-      if global.object[0].number[0] == 1 and global.object[0].number[2] != 1 then 
-         global.object[0].number[2] = 1
-         if script_option[2] == 2 then 
-            send_incident(flag_grabbed_neutral, global.player[1], current_team)
-         end
-         if not script_option[2] == 2 then 
-            send_incident(flag_grabbed, global.player[1], current_team)
-         end
-         global.object[0].timer[2].reset()
-      end
-      if global.object[0].number[0] != 1 then 
-         global.object[0].number[2] = 0
-      end
-      if global.object[0].number[0] == 1 or global.object[0].number[0] == 0 then 
-         global.object[0].number[3] = 0
-      end
-   end
-end
+function handle_flag_being_dropped()
+    if flag_or_biped_reference.number[0] == 1 then -- If someone carried the flag.
+        flag_or_biped_reference.number[0] = 2 -- Flag: the flag it's dropped.
 
-for each player do
-   global.object[0] = current_player.biped
-   if not global.object[0] == no_object then 
-      global.object[1] = no_object
-      global.object[1] = current_player.get_weapon(primary)
-      if not global.object[1].is_of_type(flag) and current_player.timer[0] > 0 then 
-         current_player.timer[0].set_rate(-100%)
-         if not current_player.timer[0].is_zero() then 
-            current_player.apply_traits(script_traits[1])
-         end
-      end
-   end
-end
+        if script_option[0] != 1 then -- If the flag return time it's different from one. 
+            flag_or_biped_reference.set_progress_bar(1, allies) -- Sets the selected return time for the flag.
+        end
 
-for each team do
-   if current_team.has_any_players() then 
-      global.object[0] = current_team.object[1]
-      for each player do
-         if global.object[0].player[0].killer_type_is(kill) then 
-            global.player[0] = global.object[0].player[0].try_get_killer()
-            send_incident(flagcarrier_kill, global.player[0], global.object[0].player[0])
-            global.object[0].player[0] = no_player
-         end
-      end
-   end
-end
+        flag_or_biped_reference.set_waypoint_icon(flag)
+        flag_or_biped_reference.set_waypoint_visibility(everyone)
+        current_team.object[1].set_waypoint_priority(high)
+    end
 
-for each object with label 5 do
-   if current_object.object[0] == no_object then 
-      current_object.object[0] = current_object.place_at_me(hill_marker, none, never_garbage_collect | suppress_effect, 0, 0, 0, none)
-      current_object.object[0].set_shape(cylinder, script_option[6], 10, 10)
-      current_object.object[0].set_shape_visibility(no_one)
-      current_object.object[0].attach_to(current_object, 0, 0, 0, relative)
-   end
-end
+    flag_or_biped_reference = current_team.object[1]
 
-for each object with label 5 do
-   if script_option[2] == 1 then 
-      global.object[0] = current_object
-      for each player do
-         if not current_player.team == global.object[0].team and global.object[0].object[0].shape_contains(current_player.biped) then 
-            global.number[2] = 1
-            global.object[0].timer[0].set_rate(0%)
-         end
-      end
-   end
-end
+    if flag_or_biped_reference != no_object then -- If a flag reference exist.
+        if flag_or_biped_reference.number[0] == 2 or flag_or_biped_reference.number[0] == 3 then -- If the flag it's dropped or ???
+            flag_or_biped_reference.timer[0].set_rate(-100%) -- Decrease the flag reset time.
+            flag_or_biped_reference.timer[1].set_rate(100%) -- Increase the flag return time.
 
-for each object with label 5 do
-   global.object[0] = current_object
-   if not global.object[0].player[0] == no_player then 
-      for each player do
-         if current_player == global.object[0].player[0] then 
-            global.player[1] = no_player
-            global.player[1] = global.object[0].get_carrier()
-            if global.player[1] == no_player then 
-               global.object[0].player[0] = no_player
+            for each player do
+                current_player.number[1] = 0 -- If this player isn't returing the flag
+
+                if current_player.team == current_team then -- If this players belongs to the current team.
+                    if flag_or_biped_reference.shape_contains(current_player.biped) then -- If the player biped is inside of the flag shape.
+                        current_player.number[1] = 1 -- Flag: Player is returning the flag
+
+                        flag_or_biped_reference.timer[1].set_rate(-100%) -- Decrease the flag return time.
+
+                        if script_option[0] == 1 then -- If the flag return time is setted to 'instant'.
+                            flag_or_biped_reference.timer[1].set_rate(-1000%)
+                        end
+
+                        flag_or_biped_reference.set_waypoint_priority(blink)
+                    end
+                end 
             end
-         end
-      end
-   end
-end
 
-for each team do
-   if current_team.has_any_players() then 
-      global.object[0] = current_team.object[1]
-      if not global.object[0] == no_object then 
-         for each object with label "ctf_res_zone" do
-            if current_object.team == current_team then 
-               current_object.enable_spawn_zone(0)
-               current_object.set_shape_visibility(no_one)
-               current_object.set_invincibility(1)
-               current_object.set_pickup_permissions(no_one)
-               if global.object[0].number[0] == 0 then 
-                  current_object.enable_spawn_zone(1)
-               end
+            for each object with label "flag" do -- Label 5 must be the label to flag objects.
+                if current_object.timer[0] < 6 then -- If the timer of the current flag is less than 6.
+                    current_object.set_waypoint_priority(blink) -- Make the waypoint start blinking.
+                end
             end
-         end
-         for each object with label "ctf_res_zone_away" do
-            if current_object.team == current_team then 
-               current_object.enable_spawn_zone(0)
-               current_object.set_shape_visibility(no_one)
-               current_object.set_invincibility(1)
-               current_object.set_pickup_permissions(no_one)
-               if not global.object[0].number[0] == 0 then 
-                  current_object.enable_spawn_zone(1)
-               end
+
+            if flag_or_biped_reference.is_out_of_bounds() or flag_or_biped_reference.timer[0].is_zero() then 
+                handle_flag_reset()
             end
-         end
-      end
-   end
+
+            if flag_or_biped_reference.timer[1].is_zero() then 
+                handle_flag_recover()
+            end
+        end
+    end
 end
 
-for each team do
-   if current_team != neutral_team and not current_team.has_any_players() and current_team.object[1] != no_object then 
-      global.object[0] = current_team.object[1]
-      if global.object[0].number[0] == 0 then 
-         current_team.object[1].delete()
-         current_team.object[1] = no_object
-      end
-   end
+function handle_flag_drop_incident()
+    flag_or_biped_reference.number[3] = 1 -- Drop incident have been sented.
+
+    if script_option[2] == 2 then -- If is neutral flag.
+        send_incident(flag_dropped_neutral, flag_or_biped_reference.player[0], current_team)
+    end
+
+    if script_option[2] != 2 then -- if is not neutral flag.
+        send_incident(flag_dropped, flag_or_biped_reference.player[0], current_team)
+    end
+
+    flag_or_biped_reference.timer[2].reset()
 end
 
-if not game.round_timer.is_zero() then 
-   game.grace_period_timer = 0
+function handle_flag_grabbed_incident()
+    flag_or_biped_reference.number[2] = 1 -- The flag have been grabbed.
+
+    if script_option[2] == 2 then -- If is neutral flag.
+        send_incident(flag_grabbed_neutral, flag_carrier, current_team)
+    end
+
+    if script_option[2] != 2 then -- If is not neutral flag.
+        send_incident(flag_grabbed, flag_carrier, current_team)
+    end
+
+    flag_or_biped_reference.timer[2].reset() -- Reset the return time, since it was just grabbed.
 end
 
-if game.round_time_limit > 0 then 
-   if not game.round_timer.is_zero() then 
-      global.number[1] = 0
-   end
-   if game.round_timer.is_zero() then 
-      if global.number[0] == 1 then 
-         game.sudden_death_timer.set_rate(-100%)
-         game.grace_period_timer.reset()
-         if global.number[1] == 0 then 
-            send_incident(sudden_death, all_players, all_players)
-            global.number[1] = 1
-         end
-         if game.sudden_death_time > 0 and game.grace_period_timer > game.sudden_death_timer then 
-            game.grace_period_timer = game.sudden_death_timer
-         end
-      end
-      if global.number[0] == 0 then 
-         game.grace_period_timer.set_rate(-100%)
-         if game.grace_period_timer.is_zero() then 
-            game.end_round()
-         end
-      end
-      if game.sudden_death_timer.is_zero() then 
-         game.end_round()
-      end
-   end
+function handle_flag_states()
+    flag_or_biped_reference = current_team.object[1]
+
+    flag_carrier = no_player -- Cleaning.
+    flag_carrier = flag_or_biped_reference.get_carrier()
+
+    is_player_inside_flag_hill_marker = 0 -- Flag: No one is inside the flag hill marker shape.
+
+    if flag_carrier != no_player then -- If the flag carrier exist.
+        handle_flag_being_carried()
+    end
+
+    if flag_carrier == no_player then -- If the flag carrier does not exist.
+        handle_flag_being_dropped()
+    end
+
+    flag_or_biped_reference = current_team.object[1] -- Set the current team's flag as the flag reference.
+    temporal_object_reference = flag_or_biped_reference.player[0].biped -- Set a temporal reference to the flag carrier biped. 
+    flag_carrier = flag_or_biped_reference.player[0] -- Set the flag carrier to the flag carrier variable.
+    
+    flag_or_biped_reference.timer[2].set_rate(-100%) -- Decrease the timer that allows to send the incident of a flag dropped/grabbed.
+
+    if flag_or_biped_reference.timer[2].is_zero() then -- If the timer that allows these incidents be sented, entry.
+        if flag_or_biped_reference.number[0] == 2 then -- If the flag is dropped.
+            if flag_or_biped_reference.number[3] != 1 then -- If the flag drop incident haven't been sented.
+                handle_flag_drop_incident()
+            end
+        end
+
+        if flag_or_biped_reference.number[0] == 1 then -- If the flag has been carried.
+            if flag_or_biped_reference.number[2] != 1 then -- If the flag haven't been grabbed.
+                handle_flag_grabbed_incident()
+            end
+        end
+
+        if flag_or_biped_reference.number[0] != 1 then -- If the flag wasn't been carried.
+            flag_or_biped_reference.number[2] = 0 -- The flag it's not grabbed.
+        altif flag_or_biped_reference.number[0] == 1 or flag_or_biped_reference.number[0] == 0 then -- If the flag was carried or the flag is on it's flag stand.
+            flag_or_biped_reference.number[3] = 0 -- Dropped flag incident haven't been sented.
+        end
+    end
 end
+
+function handle_flag_carrier_killed_incident()
+    flag_or_biped_reference = current_team.object[1] -- Set a reference to the current team's flag.
+
+    for each player do
+        if flag_or_biped_reference.player[0].killer_type_is(kill) then -- If a enemy player killed the flag carrier.
+            flag_carrier_killer = flag_or_biped_reference.player[0].try_get_killer() -- Get the flag carrier killer.
+            send_incident(flagcarrier_kill, flag_carrier_killer, flag_or_biped_reference.player[0]) -- Send the flag carrier killed incident.
+            flag_or_biped_reference.player[0] = no_player -- Cleaning.
+        end
+    end
+end
+
+function handle_flag_respawn_zones()
+    if current_team.has_any_players() then -- If this team has any players.
+        flag_or_biped_reference = current_team.object[1] -- Set the flag reference as the current team's flag.
+
+        if flag_or_biped_reference != no_object then -- If this team's flag doesn't exists.
+            for each object with label "ctf_res_zone" do -- Flag respawn zone (usually team's base), where the flag it's going to respawn.
+                if current_object.team == current_team then -- If this flag stand it's from this team.
+                    current_object.enable_spawn_zone(0)
+                    current_object.set_shape_visibility(no_one)
+                    current_object.set_invincibility(1)
+                    current_object.set_pickup_permissions(no_one)
+
+                    if flag_or_biped_reference.number[0] == 0 then -- If the flag hasn't been carried.
+                        current_object.enable_spawn_zone(1) -- The flag can respawn?
+                    end
+                end
+            end
+
+            for each object with label "ctf_res_zone_away" do -- Flag respawn zone away (usually a place between team's bases), where the flag it's going to respawn.
+                if current_object.team == current_team then -- If this flag stand it's from this team.
+                    current_object.enable_spawn_zone(0)
+                    current_object.set_shape_visibility(no_one)
+                    current_object.set_invincibility(1)
+                    current_object.set_pickup_permissions(no_one)
+
+                    if not flag_or_biped_reference.number[0] == 0 then 
+                        current_object.enable_spawn_zone(1)
+                    end
+                end
+            end
+        end
+    end
+end
+
+function cleanup_flags_from_empty_teams()
+    if current_team != neutral_team then -- If this team is not neutral.
+        if not current_team.has_any_players() then -- If this team has players, then don't enter.
+            if current_team.object[1] != no_object then -- If this team has a flag.
+                flag_or_biped_reference = current_team.object[1]
+
+                if flag_or_biped_reference.number[0] == 0 then  -- If the flag hasn't been carried.
+                    current_team.object[1].delete() -- Delete this flag.
+                    current_team.object[1] = no_object -- Cleaning.
+                end
+            end
+        end
+    end
+end
+
+function handle_teams()
+    for each team do
+        cleanup_flags_from_empty_teams()
+        handle_flag_respawn_zones()
+        handle_flag_states()
+        set_flag_object()
+        handle_modes()
+
+        if current_team.has_any_players() then -- If this team has any players.
+            handle_flag_carrier_killed_incident()
+        end
+    end
+end
+
+-- Summary:
+-- Creates a hill marker, then sets a shape to it.
+function handle_flag_hill_markers()
+    if current_object.object[0] == no_object then -- If this flag doesn't have a hill marker to give a shape to the flag.
+        current_object.object[0] = current_object.place_at_me(hill_marker, none, never_garbage_collect | suppress_effect, 0, 0, 0, none)
+        current_object.object[0].set_shape(cylinder, 10, 10, 10)
+        current_object.object[0].set_shape_visibility(no_one)
+        current_object.object[0].attach_to(current_object, 0, 0, 0, relative)
+    end
+end
+
+function handle_one_sided_flag_reset_timer()
+    flag_or_biped_reference = current_object -- Set the flag to this variable.
+
+    for each player do
+        if current_player.team != flag_or_biped_reference.team then -- If the team of this player is different from the flag team's.
+            if flag_or_biped_reference.object[0].shape_contains(current_player.biped) then -- If the hill marker shape contains the current player's biped.
+                is_player_inside_flag_hill_marker = 1 -- Flag: A player it's inside of the hill marker shape, attached to the flag.
+                flag_or_biped_reference.timer[0].set_rate(0%) -- Stops the reset timer.
+            end
+        end
+    end
+end
+
+function handle_flag_carrier_references()
+    flag_or_biped_reference = current_object
+
+    if flag_or_biped_reference.player[0] != no_player then -- If a player is carrying this flag.
+        for each player do
+            if current_player == flag_or_biped_reference.player[0] then -- If this player is the flag carrier.
+                flag_carrier = no_player -- Cleaning.
+                flag_carrier = flag_or_biped_reference.get_carrier() -- Set the flag carrier.
+
+                if flag_carrier == no_player then -- If there's no flag carrier.
+                    flag_or_biped_reference.player[0] = no_player -- Clear the reference.
+                end
+            end
+        end
+    end
+end
+
+function handle_flags()
+    is_flag_being_carried = 0 -- The flag isn't beign carried.
+
+    for each object with label "flag" do -- For each flag.
+        handle_flag_hill_markers()
+        handle_flag_carrier_references()
+
+        if script_option[2] == 1 then -- If one-sided flag is enabled.
+            handle_one_sided_flag_reset_timer()
+        end
+    end
+end
+
+function handle_game_states()
+    if not game.round_timer.is_zero() then -- If round timer is zero.
+        game.grace_period_timer = 0 -- Set grace period timer to zero.
+    end
+
+    if game.round_time_limit > 0 then -- If round time limit it's higher than zero.
+        if not game.round_timer.is_zero() then -- If round timer is not zero.
+            is_sudden_death_started = 0 -- Flag: sudden death hasn't started.
+        end
+
+        if game.round_timer.is_zero() then -- If round timer is zero.
+            if is_flag_being_carried == 1 then -- If the flag is being carried.
+                game.sudden_death_timer.set_rate(-100%) -- Decrease sudden death timer.
+                game.grace_period_timer.reset() -- Reset grace period timer.
+
+                if is_sudden_death_started == 0 then -- If sudden death hasn't started.
+                    send_incident(sudden_death, all_players, all_players) -- Sudden death has started.
+                    is_sudden_death_started = 1 -- Sudden death has started.
+                altif game.sudden_death_time > 0  then -- If sudden death time is greater than zero.
+                    if game.grace_period_timer > game.sudden_death_timer then -- If grace period timer is greater than sudden death timer.
+                        game.grace_period_timer = game.sudden_death_timer -- Sets sudden death timer value to grace period timer.
+                    end
+                end
+            end
+
+            if is_flag_being_carried == 0 then -- If no one is carrying the flag.
+                game.grace_period_timer.set_rate(-100%) -- Decrease the grace period timer.
+                
+                if game.grace_period_timer.is_zero() then -- If grace period timer is zero.
+                    game.end_round() -- End round.
+                end
+            altif game.sudden_death_timer.is_zero() then -- If sudden death timer is zero.
+            game.end_round() -- End round.
+            end
+        end
+    end
+end
+
+do
+    handle_game_states()
+    handle_players()
+    handle_teams()
+    handle_flags()
+end
+
+-- Base code

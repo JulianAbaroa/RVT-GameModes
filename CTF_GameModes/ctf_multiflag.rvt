@@ -378,7 +378,7 @@ function handle_flag_being_dropped()
                 end 
             end
 
-            for each object with label 5 do -- Label 5 must be the label to flag objects.
+            for each object with label "flag" do -- Label 5 must be the label to flag objects.
                 if current_object.timer[0] < 6 then -- If the timer of the current flag is less than 6.
                     current_object.set_waypoint_priority(blink) -- Make the waypoint start blinking.
                 end
@@ -585,7 +585,7 @@ end
 function handle_flags()
     is_flag_being_carried = 0 -- The flag isn't beign carried.
 
-    for each object with label 5 do -- For each flag.
+    for each object with label "flag" do -- For each flag.
         handle_flag_hill_markers()
         handle_flag_carrier_references()
 
