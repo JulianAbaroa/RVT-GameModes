@@ -28,50 +28,59 @@ function create_initial_spawn_points()
 end
 
 function set_invincible()
-   for each object with label "invincible" do
+   for each object with label "deathless_zone" do
       for each player do
          if current_object.shape_contains(current_player.biped) then
-            current_player.biped.set_invincibility(1)
+            current_player.biped.shields = 100
+            current_player.biped.health = 100
          end
       end
    end
 end
 
 do
+   set_invincible()
    await_timer.set_rate(100%)
 
    if await_timer >= 20 then
       delete_initial_spawn_points()
       create_initial_spawn_points()
+      await_timer.set_rate(0%)
    end
 end
 
 -- Tournament Configuration
 
--- Spectator Mode: If a specator faults, every spectator dies (not always, very weird), spectator don't die we it's close to a player
 
-declare global.object[2] with network priority high
-alias spectator_shape = global.object[2]
+
+-- Spectator Mode
+
+declare global.object[1] with network priority local
+alias spectator_shape = global.object[1]
+
+function handle_hidden_players()
+   if current_player.team == team[2] then -- If this player is a spectator.
+       current_player.biped.set_hidden(true) -- Hide this player.
+   altif current_player.team != team[2] then -- If this player is not a spectator.
+       current_player.biped.set_hidden(false) -- Show this player.
+   end  
+end
 
 on local: do
-    for each player do
-        if current_player.biped != no_object then
-            if current_player.team == team[2] then
-                current_player.biped.set_hidden(true)
-            altif current_player.team != team[2] then
-                current_player.biped.set_hidden(false)
-            end    
-        end
-    end
+   for each player do
+      if current_player.biped != no_object then -- If this player is not dead.
+         handle_hidden_players()
+      end
+   end
 
     for each team do
-        if current_team == team[2] then -- If this team is the spectators team.
-            if current_team.has_any_players() then -- If this team has any players.
-                if current_team.score != -1 then -- If this team's score it's not minus one.
-                    current_team.score = -1 -- Set this team's score to minus one.
-                end
+      if current_team == team[2] then -- If this team is the spectators team.
+         if current_team.has_any_players() then -- If this team has any players.
+            if current_team.score != -1 then -- If this team's score it's not minus one.
+               current_team.score = -1 -- Set this team's score to minus one.
             end
-        end
+         end
+      end
     end
 end
 
@@ -90,10 +99,6 @@ function handle_spectator_conversion()
     new_biped = no_object -- Cleaning.
 end
 
-function penalize_spectator()
-   current_player.biped.delete() -- Should be local?
-end
-
 function remove_grenades()
    current_player.frag_grenades = 0
    current_player.plasma_grenades = 0
@@ -101,38 +106,30 @@ end
 
 function set_spectator_shape()
     spectator_shape = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
-    spectator_shape.object[0] = current_player.biped
+    spectator_shape.object[0] = current_player.biped -- Save the player's biped into the spectator_shape objects.
 
     spectator_shape.set_shape(sphere, 30)
-    spectator_shape.set_shape_visibility(everyone)
+    spectator_shape.set_shape_visibility(no_one)
     spectator_shape.attach_to(current_player.biped, 0, 0, 0, relative)
 end
 
+function penalize_spectator()
+   spectator_shape.object[0].delete() -- Kill this spectator.
+   spectator_shape.delete() -- Delete this spectator shape.
+   spectator_shape = no_object -- Cleaning.
+end
+
 function handle_spectator_shape()
-   -- Test this.
-   for each object with label "spectator_shape" do
-      for each player do
-         if current_player.team != team[2] then -- If this player team is different from the spectator team.
-            if current_object.shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
-               current_object.object[0].delete() -- Kill this spectator.
-            end   
-         end
+   for each player do
+      if current_player.team != team[2] then -- If this player team is different from the spectator team.
+         if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
+            penalize_spectator()
+         end   
       end
    end
 
-   --alias spectator_player = allocate global.player
-   --spectator_player = current_player
-
-   --for each player do
-   --   if current_player.team != team[2] then -- If this player isn't the spectator.
-   --      if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player's biped.
-   --         spectator_player.biped.delete() -- Should be local?
-   --      end
-   --   end 
-   --end
-
    for each object with label "weapon" do
-      if spectator_shape.shape_contains(current_object) then
+      if spectator_shape.shape_contains(current_object) then -- If the spectator shape contains this weapon.
          penalize_spectator()
       end
    end
@@ -145,16 +142,16 @@ function handle_spectator()
    alias weapon = allocate global.object
    weapon = current_player.get_weapon(primary)
 
-   if ability != no_object or weapon != no_object then -- If this player has a armor ability.
-      penalize_spectator() -- Apply the penalites to this spectator.
+   if ability != no_object or weapon != no_object then -- If this player has a armor ability or a weapon.
+      penalize_spectator()
    end
 
    remove_grenades() -- Set this spectator grenades to zero.
 
    -- The spectators have to be killed if they get too close to players and to flags.
-   if spectator_shape == no_object then
+   if spectator_shape == no_object then -- If this player doesn't have a spectator shape.
       set_spectator_shape()
-   altif spectator_shape != no_object then
+   altif spectator_shape != no_object then -- If this player has a spectator shape.
       handle_spectator_shape()
    end
 end
@@ -163,11 +160,17 @@ for each player do
    if current_player.team == team[2] then -- If this player is a spectator.
       if current_player.biped != no_object then -- If this player isn't dead.
          if not current_player.biped.is_of_type(monitor) then -- If this player's biped is not a monitor.
-            handle_spectator_conversion() -- Transform the player biped to a monitor.
+            handle_spectator_conversion()
          altif current_player.biped.is_of_type(monitor) then -- If this player's biped is a monitor.
             handle_spectator()
          end
       end
+   end
+end
+
+for each object with label "spectator_shape" do
+   if current_object.object[0] == no_object then
+      current_object.delete()
    end
 end
 
