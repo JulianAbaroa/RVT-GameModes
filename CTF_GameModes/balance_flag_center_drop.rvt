@@ -432,9 +432,7 @@ function handle_flag_being_carried()
     if map_is_compatible == 1 then
         if current_team == team[0] then
            red_flag_on_base = 0 -- La bandera roja esta siendo llevada
-        end
-
-        if current_team == team[1] then
+        altif current_team == team[1] then
            blue_flag_on_base = 0 -- La bandera azul esta siendo llevada
         end
     end
@@ -469,9 +467,7 @@ function handle_flag_being_carried()
                     red_flag_drop_timer.reset() -- Se resetea el timer del equipo azul.
                     red_flag_on_base = 1 -- La bandera roja esta en su base.
                     blue_pushes = 0 -- El contador de pusheos del equipo azul se resetea.
-                end
-                    
-                if current_team == team[1] then -- Si es el equipo azul.
+                altif current_team == team[1] then -- Si es el equipo azul.
                     blue_flag_drop_timer.reset() -- Se resetea el timer del equipo rojo.
                     blue_flag_on_base = 1 -- La bandera azul esta en su base.
                     red_pushes = 0 -- El contador de pusheos del equipo rojo se resetea.
@@ -495,17 +491,15 @@ function handle_flag_reset()
 
 -- Flag Center Drop
 
-            if map_is_compatible == 1 then
-                if current_team == team[0] then -- Si es el equipo rojo.
-                    red_flag_drop_timer.reset() -- Se resetea el timer del equipo azul.
-                    red_flag_on_base = 1 -- La bandera roja esta en su base.
-                end
-
-                if current_team == team[1] then
-                    blue_flag_drop_timer.reset() -- Se resetea el timer del equipo rojo.
-                    blue_flag_on_base = 1 -- La bandera azul esta en su base.
-                end
+        if map_is_compatible == 1 then
+            if current_team == team[0] then -- Si es el equipo rojo.
+                red_flag_drop_timer.reset() -- Se resetea el timer del equipo azul.
+                red_flag_on_base = 1 -- La bandera roja esta en su base.
+            altif current_team == team[1] then
+                blue_flag_drop_timer.reset() -- Se resetea el timer del equipo rojo.
+                blue_flag_on_base = 1 -- La bandera azul esta en su base.
             end
+        end
 
 -- Flag Center Drop
 
@@ -523,9 +517,7 @@ function handle_flag_recover()
                red_flag_drop_timer.reset() -- Se resetea el timer del equipo azul.
                red_flag_on_base = 1 -- La bandera roja esta en su base.
                blue_pushes += 1 -- Se incrementa el contador de pusheos del equipo azul.
-            end
-
-            if current_team == team[1] then -- Si es el equipo azul.
+            altif current_team == team[1] then -- Si es el equipo azul.
                blue_flag_drop_timer.reset() -- Se resetea el timer del equipo rojo.
                blue_flag_on_base = 1 -- La bandera azul esta en su base.
                red_pushes += 1 -- Se incrementa el contador de pusheos del equipo rojo.

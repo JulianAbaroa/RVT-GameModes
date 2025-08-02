@@ -70,6 +70,8 @@ function initialize_portals_texts()
         end
 
         if current_object.spawn_sequence == 2 then -- It's a base to road teleporter
+            current_object.set_shape_visibility(everyone)
+
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("To road")
             current_object.set_waypoint_priority(low)
@@ -183,7 +185,7 @@ function set_spectator_shape()
     spectator_shape = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
     spectator_shape.object[0] = current_player.biped -- Save the player's biped into the spectator_shape objects.
 
-    spectator_shape.set_shape(sphere, 30)
+    spectator_shape.set_shape(sphere, 20)
     spectator_shape.set_shape_visibility(no_one)
     spectator_shape.attach_to(current_player.biped, 0, 0, 0, relative)
 end
@@ -195,19 +197,33 @@ function penalize_spectator()
 end
 
 function handle_spectator_shape()
-   for each player do
-      if current_player.team != team[2] then -- If this player team is different from the spectator team.
-         if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
-            penalize_spectator()
-         end   
-      end
-   end
+    for each player do
+        if current_player.team != team[2] then -- If this player team is different from the spectator team.
+            if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
+                penalize_spectator()
+            end   
+        end
+    end
 
-   for each object with label "weapon" do
-      if spectator_shape.shape_contains(current_object) then -- If the spectator shape contains this weapon.
-         penalize_spectator()
-      end
-   end
+    for each object with label "weapon" do
+        if spectator_shape.shape_contains(current_object) then -- If the spectator shape contains this weapon.
+            penalize_spectator()
+        end
+    end
+
+    for each object with label "teleporter" do
+        if current_object.spawn_sequence == 0 then
+            if spectator_shape.shape_contains(current_object) then -- If the spectator shape contains this teleporter.
+                penalize_spectator()
+            end
+        end
+    end
+
+    for each object with label "flag" do
+        if spectator_shape.shape_contains(current_object) then -- If the spectator shape contains this teleporter.
+            penalize_spectator()
+        end
+    end
 end
 
 function handle_spectator()
