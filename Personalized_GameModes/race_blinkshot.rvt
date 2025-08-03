@@ -1,0 +1,180 @@
+-- Blinkshot 
+
+declare global.object[0]
+alias object_to_attach = global.object[0]
+
+declare global.object[1]
+alias teleporter = global.object[1] -- Monitor that it's attached to the attachable objects.
+
+declare global.object[2] with network priority local
+alias player_vehicle = global.object[2]
+
+declare global.number[0]
+alias monitor_state = global.number[0] -- Monitor shields and health.
+
+declare global.number[1] = 10
+alias ticks_delay = global.number[1] -- The ticks delay before detach the teleported player.
+
+declare object.object[0] -- Flag: determines wether a telporter spawnpoint has a teleporter.
+declare player.object[0] -- Used to store the object where the player it's going to be teleported.
+declare player.number[0] -- Flag: determines wether the player has been teleported or not.
+declare player.number[1] -- Flag: the current ticks of the delay for the detach.
+
+function handle_teleporters_spawnpoint()
+    for each object with label "teleporter_spawnpoint" do
+        if current_object.object[0] == no_object then -- If "teleporter" doesn't exists on this "teleporter_spawnpoint".
+            current_object.timer[0].set_rate(100%) -- Starts the timer to spawn the "teleporter" again.
+            
+            if current_object.timer[0] >= 3 then
+                teleporter = current_object.place_at_me(monitor, "teleporter", never_garbage_collect, 0, 0, 0, default)
+
+                teleporter.set_scale(130)
+                teleporter.set_waypoint_priority(low)
+                teleporter.set_waypoint_visibility(everyone)
+                teleporter.set_waypoint_range(15, 100)
+
+                current_object.object[0] = teleporter -- Save the "teleporter", inside the "teleporter_spawnpoint".
+                current_object.timer[0].set_rate(0%) -- Stops the timer to spawn the "teleporter" again.
+                current_object.timer[0] = 0 -- Sets the timer value to zero.
+            end
+        end
+    end
+end 
+
+function handle_monitors_health()
+    for each object with label "teleporter" do
+        monitor_state = current_object.shields
+        if monitor_state > 0 then
+            current_object.shields = 0
+        end
+
+        monitor_state = current_object.health
+        if monitor_state > 10 then
+            current_object.health = 10
+        end
+    end
+end
+
+function handle_players_teleportation()
+    -- Get the player's vehicles.
+    for each player do
+        player_vehicle = current_player.get_vehicle() -- Get the player's vehicle.
+
+        if player_vehicle != no_object then -- If this player is on a vehicle.
+            current_player.object[1] = player_vehicle -- Save this vehicle inside the player's data.
+        end
+    end
+
+    for each player do
+        if current_player.object[0] != no_object then -- If this player destroyed a monitor.
+            alias this_player = allocate global.player
+            this_player = current_player -- Save this player.
+
+            alias temporal_vehicle = allocate global.object
+            alias temporal_player = allocate global.player
+        
+            -- Save the players together if they are on the same vehicle.
+            for each player do
+                if this_player != current_player then 
+                    if this_player.object[1] == current_player.object[1] then -- If this two players are on the same vehicle.
+                        if this_player.player[0] == no_player then 
+                            this_player.player[0] = current_player -- Save the current player inside 'this_player'.
+                        altif this_player.player[1] == no_player then
+                            this_player.player[0] = current_player
+                        end
+                    end
+                end
+            end
+
+            object_to_attach = this_player.object[0] -- Get the object to attach.
+            temporal_vehicle = this_player.object[1] -- Save the vehicle on this variable.
+
+            if temporal_vehicle != no_object then -- If this player is on a vehicle.
+                if temporal_vehicle.is_of_type(warthog) then -- If this player is on a warthog.
+                    this_player.object[1] = object_to_attach.place_at_me(warthog, none, none, 0, 0, -10, none) -- Create another instance of the player's vehicle
+
+                    if this_player.player[0] != no_player then
+                        temporal_player = this_player.player[0]
+                        temporal_player.object[1] = this_player.object[1]
+
+                    altif this_player.player[1] != no_player then
+                        temporal_player = this_player.player[1]
+                        temporal_player.object[1] = this_player.object[1]
+                    end
+
+                altif this_player.object[1].is_of_type(ghost) then
+                    object_to_attach.place_at_me(ghost, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+                
+                altif this_player.object[1].is_of_type(revenant) then
+                    object_to_attach.place_at_me(revenant, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+                
+                altif this_player.object[1].is_of_type(mongoose) then
+                    object_to_attach.place_at_me(mongoose, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+                end
+                
+                temporal_vehicle.delete() -- Delete the previous player's vehicle.
+            end
+
+            this_player.number[0] = 1 -- Flag: Player has to be teleported.
+
+            if this_player.player[0] != no_player then
+                temporal_player = this_player.player[0]
+
+                temporal_player.number[0] = 1
+            altif this_player.player[1] != no_player then
+                temporal_player = this_player.player[1]
+
+                temporal_player.number[0] = 1
+            end
+
+            temporal_vehicle = no_object
+            temporal_player = no_player
+        end
+
+        if current_player.number[0] == 1 then -- If the player has been teleported.
+            if current_player.object[1] != no_object then -- If this player was on a vehicle.
+                alias old_biped = allocate global.object
+                alias new_biped = allocate global.object
+                
+                old_biped = current_player.biped
+
+                if old_biped.is_of_type(spartan) then
+                    new_biped = current_player.object[1].place_at_me(spartan, none, none, 0, 0, 0, none)
+                altif old_biped.is_of_type(elite) then
+                    new_biped = current_player.object[1].place_at_me(elite, none, none, 0, 0, 0, none)
+                end
+
+                current_player.set_biped(new_biped)
+                old_biped.delete()
+
+                old_biped = no_object -- Cleaning.
+                new_biped = no_object -- Cleaning.
+
+                current_player.force_into_vehicle(current_player.object[1]) -- Force this player into this new vehicle.
+            end
+                    
+            object_to_attach.delete()
+                    
+            current_player.object[0] = no_object -- Cleaning.
+            current_player.object[1] = no_object -- Cleaning.
+            current_player.number[0] = 0 -- The player has not been teleported.
+            current_player.number[1] = 0 -- The ticks counter is reseted.
+        end
+    end
+end
+
+do
+    handle_teleporters_spawnpoint()
+    handle_players_teleportation()
+    handle_monitors_health()
+end
+
+on object death: do
+    if killed_object.has_forge_label("teleporter") then -- If the object destroyed has the "teleporter" label.
+        object_to_attach = killed_object.place_at_me(hill_marker, none, never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
+        killer_player.object[0] = object_to_attach -- Assign the spawned object directly to the player.
+        object_to_attach = no_object -- Cleaning.
+    end
+end
+
+-- Blinkshot
