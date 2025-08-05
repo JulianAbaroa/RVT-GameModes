@@ -1,5 +1,8 @@
 -- Blinkshot 
 
+-- Raro que en el CGB el jugador no se vea teletranspotado hacia el object_to_attach, cuando
+-- si deberia de ocurrir. De esta forma podria evitar asignar nuevos bipeds.
+
 declare global.object[0]
 alias object_to_attach = global.object[0]
 
@@ -55,7 +58,7 @@ function handle_monitors_health()
     end
 end
 
-function handle_players_teleportation()
+function handle_vehicles_teleportation()
     -- Get the player's vehicles.
     for each player do
         player_vehicle = current_player.get_vehicle() -- Get the player's vehicle.
@@ -66,7 +69,7 @@ function handle_players_teleportation()
     end
 
     for each player do
-        if current_player.object[0] != no_object then -- If this player destroyed a monitor.
+        if current_player.object[0] != no_object and current_player.number[0] == 0 then -- If this player destroyed a monitor.
             alias this_player = allocate global.player
             this_player = current_player -- Save this player.
 
@@ -91,14 +94,19 @@ function handle_players_teleportation()
 
             if temporal_vehicle != no_object then -- If this player is on a vehicle.
                 if temporal_vehicle.is_of_type(warthog) then -- If this player is on a warthog.
-                    this_player.object[1] = object_to_attach.place_at_me(warthog, none, none, 0, 0, -10, none) -- Create another instance of the player's vehicle
+                    this_player.biped.attach_to(object_to_attach, 0, 0, 0, relative)
+                    this_player.object[1] = object_to_attach.place_at_me(warthog, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
 
                     if this_player.player[0] != no_player then
                         temporal_player = this_player.player[0]
+
+                        temporal_player.biped.attach_to(object_to_attach, 0, 0, 0, relative)
                         temporal_player.object[1] = this_player.object[1]
 
                     altif this_player.player[1] != no_player then
                         temporal_player = this_player.player[1]
+
+                        temporal_player.biped.attach_to(object_to_attach, 0, 0, 0, relative)
                         temporal_player.object[1] = this_player.object[1]
                     end
 
@@ -131,29 +139,15 @@ function handle_players_teleportation()
             temporal_player = no_player
         end
 
+        -- Compatibilidad con multiples jugadores inexistente.
+        -- Hay que limpiar el current_player.object[1] cuando los jugadores se bajan de los vehiculos.
+
         if current_player.number[0] == 1 then -- If the player has been teleported.
             if current_player.object[1] != no_object then -- If this player was on a vehicle.
-                alias old_biped = allocate global.object
-                alias new_biped = allocate global.object
-                
-                old_biped = current_player.biped
-
-                if old_biped.is_of_type(spartan) then
-                    new_biped = current_player.object[1].place_at_me(spartan, none, none, 0, 0, 0, none)
-                altif old_biped.is_of_type(elite) then
-                    new_biped = current_player.object[1].place_at_me(elite, none, none, 0, 0, 0, none)
-                end
-
-                current_player.set_biped(new_biped)
-                old_biped.delete()
-
-                old_biped = no_object -- Cleaning.
-                new_biped = no_object -- Cleaning.
-
+                current_player.biped.detach()
                 current_player.force_into_vehicle(current_player.object[1]) -- Force this player into this new vehicle.
+                object_to_attach.delete()
             end
-                    
-            object_to_attach.delete()
                     
             current_player.object[0] = no_object -- Cleaning.
             current_player.object[1] = no_object -- Cleaning.
@@ -165,7 +159,7 @@ end
 
 do
     handle_teleporters_spawnpoint()
-    handle_players_teleportation()
+    handle_vehicles_teleportation()
     handle_monitors_health()
 end
 

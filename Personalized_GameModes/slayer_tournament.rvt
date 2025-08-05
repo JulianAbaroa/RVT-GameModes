@@ -55,8 +55,7 @@ end
 
 -- Spectator Mode
 
-declare global.object[1] with network priority local
-alias spectator_shape = global.object[1]
+declare player.object[1] with network priority local -- Used to store each spectator's shape.
 
 function handle_hidden_players()
    if current_player.team == team[2] then -- If this player is a spectator.
@@ -105,31 +104,35 @@ function remove_grenades()
 end
 
 function set_spectator_shape()
-    spectator_shape = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
-    spectator_shape.object[0] = current_player.biped -- Save the player's biped into the spectator_shape objects.
+   current_player.object[1] = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
 
-    spectator_shape.set_shape(sphere, 30)
-    spectator_shape.set_shape_visibility(no_one)
-    spectator_shape.attach_to(current_player.biped, 0, 0, 0, relative)
+    current_player.object[1].set_shape(sphere, 20)
+    current_player.object[1].set_shape_visibility(no_one)
+    current_player.object[1].attach_to(current_player.biped, 0, 0, 0, relative)
 end
 
 function penalize_spectator()
-   spectator_shape.object[0].delete() -- Kill this spectator.
-   spectator_shape.delete() -- Delete this spectator shape.
-   spectator_shape = no_object -- Cleaning.
+   current_player.biped.delete() -- Kill this spectator.
+   current_player.object[1].delete() -- Delete this spectator shape.
+   current_player.object[1] = no_object -- Cleaning.
 end
 
 function handle_spectator_shape()
+   alias this_player = allocate global.player
+   this_player = current_player
+
    for each player do
       if current_player.team != team[2] then -- If this player team is different from the spectator team.
-         if spectator_shape.shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
-            penalize_spectator()
+         if this_player.object[1].shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
+            this_player.biped.delete()
+            this_player.object[1].delete()
+            this_player.object[1] = no_object
          end   
       end
    end
 
    for each object with label "weapon" do
-      if spectator_shape.shape_contains(current_object) then -- If the spectator shape contains this weapon.
+      if current_player.object[1].shape_contains(current_object) then -- If the spectator shape contains this weapon.
          penalize_spectator()
       end
    end
@@ -149,9 +152,9 @@ function handle_spectator()
    remove_grenades() -- Set this spectator grenades to zero.
 
    -- The spectators have to be killed if they get too close to players and to flags.
-   if spectator_shape == no_object then -- If this player doesn't have a spectator shape.
+   if current_player.object[1] == no_object then -- If this player doesn't have a spectator shape.
       set_spectator_shape()
-   altif spectator_shape != no_object then -- If this player has a spectator shape.
+   altif current_player.object[1] != no_object then -- If this player has a spectator shape.
       handle_spectator_shape()
    end
 end
@@ -168,11 +171,11 @@ for each player do
    end
 end
 
-for each object with label "spectator_shape" do
-   if current_object.object[0] == no_object then
-      current_object.delete()
-   end
-end
+--for each object with label "spectator_shape" do
+--   if current_object.object[0] == no_object then
+--      current_object.delete()
+--   end
+--end
 
 -- Spectator Mode
 
