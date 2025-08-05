@@ -171,12 +171,6 @@ for each player do
    end
 end
 
---for each object with label "spectator_shape" do
---   if current_object.object[0] == no_object then
---      current_object.delete()
---   end
---end
-
 -- Spectator Mode
 
 declare global.number[0] with network priority local
