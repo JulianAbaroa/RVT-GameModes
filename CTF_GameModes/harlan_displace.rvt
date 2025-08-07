@@ -87,33 +87,40 @@ function initialize_portals_texts()
 
         if current_object.spawn_sequence == 4 then -- It's a offense I teleporter.
             current_object.set_waypoint_visibility(everyone)
-            current_object.set_waypoint_text("Offense I")
+            current_object.set_waypoint_text("Valley")
             current_object.set_waypoint_priority(low)
             current_object.set_waypoint_range(0, 20)
         end 
 
         if current_object.spawn_sequence == 5 then -- It's a offense II teleporter. 
             current_object.set_waypoint_visibility(everyone)
-            current_object.set_waypoint_text("Offense II")
+            current_object.set_waypoint_text("Hangar")
             current_object.set_waypoint_priority(low)
             current_object.set_waypoint_range(0, 20)
         end
 
-        if current_object.spawn_sequence == 6 then
+        if current_object.spawn_sequence == 6 then -- It's a offense I teleporter.
+            current_object.set_waypoint_visibility(everyone)
+            current_object.set_waypoint_text("Sea")
+            current_object.set_waypoint_priority(low)
+            current_object.set_waypoint_range(0, 20)
+        end 
+
+        if current_object.spawn_sequence == 7 then
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("Up")
             current_object.set_waypoint_priority(low)
             current_object.set_waypoint_range(0, 20)
         end
 
-        if current_object.spawn_sequence == 7 then
+        if current_object.spawn_sequence == 8 then
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("Down")
             current_object.set_waypoint_priority(low)
             current_object.set_waypoint_range(0, 20)
         end
 
-        if current_object.spawn_sequence == 8 then
+        if current_object.spawn_sequence == 9 then
             current_object.set_waypoint_visibility(everyone)
             current_object.set_waypoint_text("Bottom")
             current_object.set_waypoint_priority(low)
@@ -181,7 +188,7 @@ function remove_grenades()
 end
 
 function set_spectator_shape()
-   current_player.object[1] = current_player.biped.place_at_me(hill_marker, "spectator_shape", none, 0, 0, 0, none)
+   current_player.object[1] = current_player.biped.place_at_me(hill_marker, none, none, 0, 0, 0, none)
 
     current_player.object[1].set_shape(sphere, 20)
     current_player.object[1].set_shape_visibility(no_one)
@@ -201,9 +208,9 @@ function handle_spectator_shape()
    for each player do
       if current_player.team != team[2] then -- If this player team is different from the spectator team.
          if this_player.object[1].shape_contains(current_player.biped) then -- If the spectator shape contains this player biped.
-            this_player.biped.delete()
             this_player.object[1].delete()
             this_player.object[1] = no_object
+            this_player.biped.delete()
          end   
       end
    end
@@ -228,7 +235,6 @@ function handle_spectator()
 
    remove_grenades() -- Set this spectator grenades to zero.
 
-   -- The spectators have to be killed if they get too close to players and to flags.
    if current_player.object[1] == no_object then -- If this player doesn't have a spectator shape.
       set_spectator_shape()
    altif current_player.object[1] != no_object then -- If this player has a spectator shape.
@@ -323,6 +329,17 @@ end
 function handle_players_teleportation()
     for each player do
         if current_player.object[2] != no_object then -- If the player detroyed a monitor.
+            alias current_weapon = allocate global.object
+            current_weapon = current_player.get_weapon(primary)
+
+            if current_weapon.is_of_type(flag) then -- If the player have the flag.
+                current_player.biped.detach() -- Cancel the teleportation.
+                current_player.object[2].delete() -- Delete the object to attach.
+                current_player.object[2] = no_object -- Clear this variable.
+                current_player.number[2] = 0 -- This player doesn't have to be teleported.
+                current_player.number[3] = 0 -- Clear the ticks counter.
+            end
+
             object_to_attach = current_player.object[2]
             current_player.biped.attach_to(object_to_attach, 0, 0, 0, relative) -- Attach player to the monitor previous position.
             current_player.number[2] = 1 -- Flag: Player has been teleported.
@@ -351,7 +368,7 @@ end
 
 on object death: do
     if killed_object.has_forge_label("teleporter") then -- If the object destroyed has the "teleporter" label.
-        object_to_attach = killed_object.place_at_me(hill_marker, "object_to_attach", never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
+        object_to_attach = killed_object.place_at_me(hill_marker, none, never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
         killer_player.object[2] = object_to_attach -- Assign the spawned object directly to the player.
         object_to_attach = no_object -- Cleaning.
     end
