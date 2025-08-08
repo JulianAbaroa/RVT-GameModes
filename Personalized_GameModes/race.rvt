@@ -1,0 +1,290 @@
+-- Gametype
+
+-- Se puede jugar de uno, dos o tres jugadores.
+
+-- Los jugadores que esten en el mismo vehiculo se asignaran al mismo fireteam.
+-- Cada jugador consguira 10 puntos por cruzar la linea de meta.
+-- El juego se gana cuando un fireteam obtenga 50 puntos.
+
+-- Entonces, si un warthog con 3 jugadores cruza la linea de meta, entonces ese fireteam conseguira 30 puntos.
+-- Pero si un ghost cruza la linea de meta, conseguira solamente 10 puntos.
+
+-- Eso da ventaja a quienes van en vehiculos con mas personas.
+
+-- Fireteams posibles:
+
+-- Una persona: Necesitara dar 10 vueltas para ganar.
+-- Dos personas: Necesitara dar 5 vueltas para ganar.
+-- Tres personas: Necesitara dar 4 vueltas para ganar.
+
+-- ¿Todos deberian de dar la misma cantidad de vueltas para ganar?
+-- ¿Entonces que es lo que incitaria a los jugadores a utilizar warthogs, revenants y mongooses?
+
+-- Una vez que los asientos de un vehiculo estan llenos, este se teletransporta, junto a los jugadores, 
+-- El inicio de la pista de carreras.
+
+function handle_vehicle_spawnpoints()
+    for each object with label "vehicle" do
+        if current_object.object[0] == no_object then -- Flag: if this object hasn't spawned any vehicle.
+            alias spawned_vehicle = allocate global.object
+            
+            if current_object.spawn_sequence == 0 then -- If this has to be a warthog.
+                spawned_vehicle = current_object.place_at_me(warthog, none, none, 0, 0, 0, none)
+            end
+    
+            if current_object.spawn_sequence == 1 then -- If this has to be a revenant.
+                spawned_vehicle = current_object.place_at_me(revenant, none, none, 0, 0, 0, none)
+            end
+    
+            if current_object.spawn_sequence == 2 then -- If this has to be a ghost.
+                spawned_vehicle = current_object.place_at_me(ghost, none, none, 0, 0, 0, none)
+            end
+            
+            if current_object.spawn_sequence == 3 then -- If this has to be a mongoose.
+                spawned_vehicle = current_object.place_at_me(mongoose, none, none, 0, 0, 0, none)
+            end
+            
+            current_object.object[0] = spawned_vehicle
+        end
+    end
+end
+
+function handle_start()
+    -- Jugador se sube a vehiculo.
+    -- ¿El vehiculo esta lleno?
+    -- Si el vehiculo esta lleno, teletransportarlo a un start_point libre.
+    -- Si el vehiculo no esta lleno, avisar al jugador de cuantos jugadores mas necesita.
+
+    for each player do
+        save_players_on_same_vehicle()
+
+        
+    end
+
+
+    for each object with label "start_point" do
+        if current_object.number[0] == 1 then -- Flag: determines wether this startpoint is being used or not.
+            -- This start_point is usable.
+        end
+    end
+end
+
+do
+    handle_vehicle_spawnpoints()
+    handle_start()
+end
+
+
+-- Vehicle Blinkshot 
+
+declare global.object[0]
+alias previous_vehicle = global.object[0] -- Used to store the previous player's vehicle.
+
+declare object.object[0] -- Flag: determines wether a telporter spawnpoint has a teleporter.
+
+declare player.object[0] -- Used to store the hill marker, where the vehicle and the players are gonna be teleported.
+declare player.object[1] -- Used to store the vehicles that has to be teleported with the players.
+declare player.object[2] -- Used to store the temporal biped.
+declare player.object[3] -- Used to store the real player's biped.
+
+declare player.number[0] -- Flag: Determines wether the player is prepared to be teleported.
+declare player.number[1] -- Used to count ticks.
+
+function handle_teleporters_spawnpoint()
+    for each object with label "teleporter_spawnpoint" do
+        if current_object.object[0] == no_object then -- If "teleporter" doesn't exists on this "teleporter_spawnpoint".
+            alias teleporter = allocate global.object -- Monitor that it's attached to the attachable objects.
+
+            current_object.timer[0].set_rate(100%) -- Starts the timer to spawn the "teleporter" again.
+            
+            if current_object.timer[0] >= 3 then
+                teleporter = current_object.place_at_me(monitor, "teleporter", never_garbage_collect, 0, 0, 0, default)
+
+                teleporter.set_scale(200)
+                teleporter.set_waypoint_priority(low)
+                teleporter.set_waypoint_visibility(everyone)
+                teleporter.set_waypoint_range(15, 100)
+
+                current_object.object[0] = teleporter -- Save the "teleporter", inside the "teleporter_spawnpoint".
+                current_object.timer[0].set_rate(0%) -- Stops the timer to spawn the "teleporter" again.
+                current_object.timer[0] = 0 -- Sets the timer value to zero.
+            end
+        end
+    end
+end 
+
+function handle_monitors_health()
+    for each object with label "teleporter" do
+        alias monitor_state = allocate global.number
+
+        monitor_state = current_object.shields
+        if monitor_state > 0 then
+            current_object.shields = 0
+        end
+
+        monitor_state = current_object.health
+        if monitor_state > 10 then
+            current_object.health = 10
+        end
+    end
+end
+
+function save_players_on_same_vehicle()
+    alias this_player = allocate global.player
+
+    this_player = current_player
+    this_player.object[1] = current_player.get_vehicle()
+
+    if this_player.object[1] != no_object then -- If this player has a vehicle.
+        for each player do
+            if this_player != current_player then -- If the current player is different from 'this_player'.
+                current_player.object[1] = current_player.get_vehicle() -- Save the current player's vehicle.
+        
+                if this_player.object[1] == current_player.object[1] then -- If this two players are on the same vehicle.
+                    if this_player.player[0] == no_player then 
+                        this_player.player[0] = current_player -- Save the current player inside 'this_player'.
+
+                    altif this_player.player[1] == no_player then
+                        if this_player.player[0] != current_player then -- To not save the same player two times.
+                            this_player.player[1] = current_player -- Save the current player inside 'this_player'.
+                        end
+                    end
+
+                altif this_player.object[1] != current_player.object[1] then -- If these player are not in the same vehicle.
+                    if this_player.player[0] == current_player then -- If the current player is saved inside 'this_player' data.
+                        this_player.player[0] = no_player -- Remove it.
+                    
+                    altif this_player.player[1] == current_player then -- If the current player is saved inside 'this_player' data.
+                        this_player.player[1] = no_player -- Remove it.
+                    end
+                end
+            end
+        end
+    end
+end
+
+function create_new_vehicle()
+    if previous_vehicle.is_of_type(warthog) then -- If this player is on a warthog.
+        current_player.object[1] = current_player.object[0].place_at_me(warthog, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+
+    altif previous_vehicle.is_of_type(ghost) then -- If this player is on a ghost.
+        current_player.object[1] = current_player.object[0].place_at_me(ghost, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+                
+    altif previous_vehicle.is_of_type(revenant) then -- If this player is on a revenant.
+        current_player.object[1] = current_player.object[0].place_at_me(revenant, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+                
+    altif previous_vehicle.is_of_type(mongoose) then -- If this player is on a mongoose.
+        current_player.object[1] = current_player.object[0].place_at_me(mongoose, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+    end
+
+    current_player.object[0].delete() -- Delete the hill marker saved on this variable.
+    current_player.object[0] = no_object -- Clear this variable.
+end
+
+function prepare_players_teleport()
+    alias temporal_player = allocate global.player
+
+    current_player.biped.detach() -- Make this player leave his vehicle.
+    current_player.number[0] = 1 -- Flag: First part of teleportation completed.
+    current_player.number[1] = 0 -- Flag: Set the tick counter to zero.
+                
+    if current_player.player[0] != no_player then -- If there's a second player on the vehicle.
+        temporal_player = current_player.player[0]
+
+        temporal_player.object[1] = current_player.object[1] -- Save the vehicle teleported on this player's data.
+        temporal_player.biped.detach() -- Make this player leave his vehicle.
+        temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
+        temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
+    end
+
+    if current_player.player[1] != no_player then -- If there's a third player on the vehicle.
+        temporal_player = current_player.player[1]
+
+        temporal_player.object[1] = current_player.object[1] -- Save the vehicle teleported on this player's data.
+        temporal_player.biped.detach() -- Make this player leave his vehicle.
+        temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
+        temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
+    end
+
+    previous_vehicle.delete() -- Delete the previous player's vehicle.
+    previous_vehicle = no_object -- Cleaning.
+    temporal_player = no_player -- Cleaning.
+end
+
+function teleport_players_to_vehicle()
+    current_player.number[1] += 1 -- Increase the ticks counter.
+
+    if current_player.number[1] == 1 then -- If this is the first tick since teleportation started.
+        current_player.object[2] = current_player.object[1].place_at_me(monitor, none, none, 0, 0, 0, none) -- Create a monitor close to the new vehicle.
+        current_player.object[3] = current_player.biped -- Save the real player's biped.
+                
+        current_player.set_biped(current_player.object[2]) -- Set the monitor as the new biped of this player.
+
+    altif current_player.number[1] == 2 then -- If this is the second tick since teleportation started.
+        current_player.object[3].attach_to(current_player.object[1], 0, 0, 10, relative) -- Move the real player's biped closer to the vehicle.
+        current_player.object[3].detach()
+
+        current_player.set_biped(current_player.object[3]) -- Return the player to it's real biped.
+                
+    altif current_player.number[1] == 3 then -- If this is the third tick since teleportation started.
+        current_player.object[2].delete() -- Delete the monitor created.
+
+        current_player.force_into_vehicle(current_player.object[1]) -- Force this player into this new vehicle.
+        
+        current_player.object[1] = no_object -- Clear the player vehicle.
+        current_player.object[2] = no_object -- Clear the temporal player's biped.
+        current_player.object[3] = no_object -- Clear the real player's biped.
+        current_player.number[0] = 0 -- Clear the 'is prepared to teleport' flag.
+        current_player.number[1] = 0 -- Clear the ticks counter.
+    end
+end
+
+function clear_saved_players()
+    current_player.player[0] = no_player -- Cleaning.
+    current_player.player[1] = no_player -- Cleaning.
+end
+
+function handle_vehicles_teleportation() -- Main function.
+    for each player do
+        clear_saved_players()
+
+        if current_player.object[0] != no_object then -- If this player on a vehicle destroyed a monitor.
+            save_players_on_same_vehicle()
+
+            if current_player.object[1] != no_object then -- If this player is on a vehicle.
+                previous_vehicle = current_player.object[1] -- Save the previous vehicle of this player.
+
+                create_new_vehicle()
+                prepare_players_teleport()
+            end
+        end
+
+        if current_player.number[0] == 1 then
+            teleport_players_to_vehicle()
+        end
+    end
+end
+
+do
+    handle_teleporters_spawnpoint()
+    handle_vehicles_teleportation()
+    handle_monitors_health()
+end
+
+on object death: do
+    if killed_object.has_forge_label("teleporter") then -- If the object destroyed has the "teleporter" label.
+        alias temporal_vehicle = allocate global.object
+        temporal_vehicle = killer_player.get_vehicle() -- Get the current player's vehicle.
+
+        if temporal_vehicle != no_object then -- If this player has a vehicle.
+            killer_player.object[0] = killed_object.place_at_me(hill_marker, none, never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
+
+        altif temporal_vehicle == no_object then -- If this player doesn't have a vehicle.
+            killer_player.object[0] = no_object -- Cleaning.
+        end
+
+        temporal_vehicle = no_object -- Cleaning.
+    end
+end
+
+-- Vehicle Blinkshot
