@@ -1,5 +1,7 @@
 -- Gametype
 
+-- Esto tiene que tener contador de tiempo!!!
+
 -- Se puede jugar de uno, dos o tres jugadores.
 
 -- Los jugadores que esten en el mismo vehiculo se asignaran al mismo fireteam.
@@ -23,6 +25,36 @@
 -- Una vez que los asientos de un vehiculo estan llenos, este se teletransporta, junto a los jugadores, 
 -- El inicio de la pista de carreras.
 
+declare player.number[2] -- Flag: determines wether the player is allowed to have or not have a vehicle.
+
+function handle_checkpoints()
+    for each object with label "checkpoint" do
+        if current_object.spawn_sequence == 0 then
+            -- Race logic...
+        altif current_object.spawn_sequence == 1 then
+            -- Race logic...
+        end
+        -- etc.
+    end
+end
+
+function handle_waypoints()
+    for each object with label "teleporter" do
+        if current_object.is_of_type(hill_marker) then
+            if current_object.spawn_sequence == 0 then
+                current_object.set_waypoint_visibility(everyone)
+                current_object.set_waypoint_text("To road")
+                current_object.set_waypoint_priority(low)
+                current_object.set_waypoint_range(0, 50)
+            end
+        end
+    end
+end
+
+on init: do
+    handle_waypoints()
+end
+
 function handle_vehicle_spawnpoints()
     for each object with label "vehicle" do
         if current_object.object[0] == no_object then -- Flag: if this object hasn't spawned any vehicle.
@@ -43,35 +75,28 @@ function handle_vehicle_spawnpoints()
             if current_object.spawn_sequence == 3 then -- If this has to be a mongoose.
                 spawned_vehicle = current_object.place_at_me(mongoose, none, none, 0, 0, 0, none)
             end
-            
+
             current_object.object[0] = spawned_vehicle
         end
     end
 end
 
-function handle_start()
-    -- Jugador se sube a vehiculo.
-    -- ¿El vehiculo esta lleno?
-    -- Si el vehiculo esta lleno, teletransportarlo a un start_point libre.
-    -- Si el vehiculo no esta lleno, avisar al jugador de cuantos jugadores mas necesita.
-
+function handle_players()
     for each player do
-        save_players_on_same_vehicle()
+        alias player_vehicle = allocate global.object
+        player_vehicle = current_player.get_vehicle()
 
-        
-    end
-
-
-    for each object with label "start_point" do
-        if current_object.number[0] == 1 then -- Flag: determines wether this startpoint is being used or not.
-            -- This start_point is usable.
+        if player_vehicle == no_object then -- If this player doesn't have a vehicle.
+            if current_player.number[2] == 1 then -- Flag: if this player is not allowed to not have a vehicle.
+                -- Volver al punto de guardado anterior, solamente si es que este existe.
+            end
         end
     end
 end
 
 do
     handle_vehicle_spawnpoints()
-    handle_start()
+    --handle_players()
 end
 
 
@@ -100,10 +125,20 @@ function handle_teleporters_spawnpoint()
             if current_object.timer[0] >= 3 then
                 teleporter = current_object.place_at_me(monitor, "teleporter", never_garbage_collect, 0, 0, 0, default)
 
-                teleporter.set_scale(200)
-                teleporter.set_waypoint_priority(low)
-                teleporter.set_waypoint_visibility(everyone)
-                teleporter.set_waypoint_range(15, 100)
+                if current_object.spawn_sequence == 0 then
+                    teleporter.set_waypoint_text("Destroy!")
+                    teleporter.set_waypoint_visibility(everyone)
+                    teleporter.set_waypoint_range(10, 100)
+                    teleporter.set_waypoint_priority(low)
+                    teleporter.set_scale(300)
+
+                altif current_object.spawn_sequence == 1 then
+                    teleporter.set_waypoint_text("Need a vehicle!")
+                    teleporter.set_waypoint_visibility(everyone)
+                    teleporter.set_waypoint_priority(low)
+                    teleporter.set_waypoint_range(0, 30)
+                    teleporter.set_scale(500)
+                end
 
                 current_object.object[0] = teleporter -- Save the "teleporter", inside the "teleporter_spawnpoint".
                 current_object.timer[0].set_rate(0%) -- Stops the timer to spawn the "teleporter" again.
@@ -187,6 +222,8 @@ function prepare_players_teleport()
     current_player.biped.detach() -- Make this player leave his vehicle.
     current_player.number[0] = 1 -- Flag: First part of teleportation completed.
     current_player.number[1] = 0 -- Flag: Set the tick counter to zero.
+
+    current_player.number[2] = 0 -- Flag: this player is allowed to not have a vehicle.
                 
     if current_player.player[0] != no_player then -- If there's a second player on the vehicle.
         temporal_player = current_player.player[0]
@@ -195,6 +232,8 @@ function prepare_players_teleport()
         temporal_player.biped.detach() -- Make this player leave his vehicle.
         temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
         temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
+
+        temporal_player.number[2] = 0 -- Flag: this player is allowed to not have a vehicle.
     end
 
     if current_player.player[1] != no_player then -- If there's a third player on the vehicle.
@@ -204,6 +243,8 @@ function prepare_players_teleport()
         temporal_player.biped.detach() -- Make this player leave his vehicle.
         temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
         temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
+
+        temporal_player.number[2] = 0 -- Flag: this player is allowed to not have a vehicle.
     end
 
     previous_vehicle.delete() -- Delete the previous player's vehicle.
@@ -236,6 +277,8 @@ function teleport_players_to_vehicle()
         current_player.object[3] = no_object -- Clear the real player's biped.
         current_player.number[0] = 0 -- Clear the 'is prepared to teleport' flag.
         current_player.number[1] = 0 -- Clear the ticks counter.
+
+        current_player.number[2] = 1 -- Flag: This player is not allowed to not have a vehicle.
     end
 end
 
@@ -273,17 +316,27 @@ end
 
 on object death: do
     if killed_object.has_forge_label("teleporter") then -- If the object destroyed has the "teleporter" label.
-        alias temporal_vehicle = allocate global.object
-        temporal_vehicle = killer_player.get_vehicle() -- Get the current player's vehicle.
+        alias distance = allocate global.number
+        distance = killed_object.get_distance_to(killer_player.biped)
 
-        if temporal_vehicle != no_object then -- If this player has a vehicle.
-            killer_player.object[0] = killed_object.place_at_me(hill_marker, none, never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
+        if distance <= 200 then
+            alias temporal_vehicle = allocate global.object
+            temporal_vehicle = killer_player.get_vehicle() -- Get the current player's vehicle.
+    
+            if temporal_vehicle != no_object then -- If this player has a vehicle.
+                killer_player.object[0] = killed_object.place_at_me(hill_marker, none, never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
+    
+            altif temporal_vehicle == no_object then -- If this player doesn't have a vehicle.
+                killer_player.object[0] = no_object -- Cleaning.
+            end
+    
+            temporal_vehicle = no_object -- Cleaning.
+            script_widget[0].set_visibility(killer_player, false)
 
-        altif temporal_vehicle == no_object then -- If this player doesn't have a vehicle.
-            killer_player.object[0] = no_object -- Cleaning.
+        altif distance > 200 then
+            script_widget[0].set_text("Get closer!")
+            script_widget[0].set_visibility(killer_player, true)
         end
-
-        temporal_vehicle = no_object -- Cleaning.
     end
 end
 

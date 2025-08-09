@@ -1,0 +1,61 @@
+
+declare global.number[0] = 0
+alias previous_speed = global.number[0]
+
+declare global.number[1]
+alias current_speed = global.number[1]
+
+for each player do
+
+    current_speed = current_player.biped.get_speed()
+
+    script_widget[1].set_text("Speed: %n", current_speed)
+    script_widget[1].set_visibility(current_player, true)
+
+    alias delta = allocate global.number
+    delta = current_speed
+    delta -= previous_speed
+
+    alias threshold = allocate global.number
+
+    if previous_speed <= 5 then 
+        threshold = 20
+    end
+
+    if previous_speed > 5 and previous_speed <= 15 then
+        threshold = 13
+    end
+
+    if previous_speed > 15 and previous_speed <= 25 then
+        threshold = 9
+    end
+
+    if previous_speed > 25 and previous_speed <= 35 then
+        threshold = 7
+    end
+
+    if delta >= threshold then
+        current_player.number[0] = 1 -- Flag: salto detectado.
+    end
+
+    if current_player.number[0] == 1 then
+        current_player.number[0] = 0
+
+        current_player.timer[0] = 0
+        current_player.timer[0].set_rate(100%)
+
+        script_widget[0].set_text("Jump Available!")
+        script_widget[0].set_visibility(current_player, true)
+
+        current_player.biped.place_at_me(block_1x1_flat, none, none, 0, 0, 3, none)
+    end 
+
+    if current_player.timer[0] > 1 then
+        current_player.timer[0] = 0
+        current_player.timer[0].set_rate(0%)
+
+        script_widget[0].set_visibility(current_player, false)
+    end
+
+    previous_speed = current_speed
+end
