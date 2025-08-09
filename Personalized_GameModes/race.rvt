@@ -1,42 +1,4 @@
--- Gametype
-
--- Esto tiene que tener contador de tiempo!!!
-
--- Se puede jugar de uno, dos o tres jugadores.
-
--- Los jugadores que esten en el mismo vehiculo se asignaran al mismo fireteam.
--- Cada jugador consguira 10 puntos por cruzar la linea de meta.
--- El juego se gana cuando un fireteam obtenga 50 puntos.
-
--- Entonces, si un warthog con 3 jugadores cruza la linea de meta, entonces ese fireteam conseguira 30 puntos.
--- Pero si un ghost cruza la linea de meta, conseguira solamente 10 puntos.
-
--- Eso da ventaja a quienes van en vehiculos con mas personas.
-
--- Fireteams posibles:
-
--- Una persona: Necesitara dar 10 vueltas para ganar.
--- Dos personas: Necesitara dar 5 vueltas para ganar.
--- Tres personas: Necesitara dar 4 vueltas para ganar.
-
--- ¿Todos deberian de dar la misma cantidad de vueltas para ganar?
--- ¿Entonces que es lo que incitaria a los jugadores a utilizar warthogs, revenants y mongooses?
-
--- Una vez que los asientos de un vehiculo estan llenos, este se teletransporta, junto a los jugadores, 
--- El inicio de la pista de carreras.
-
-declare player.number[2] -- Flag: determines wether the player is allowed to have or not have a vehicle.
-
-function handle_checkpoints()
-    for each object with label "checkpoint" do
-        if current_object.spawn_sequence == 0 then
-            -- Race logic...
-        altif current_object.spawn_sequence == 1 then
-            -- Race logic...
-        end
-        -- etc.
-    end
-end
+-- Race GT
 
 function handle_waypoints()
     for each object with label "teleporter" do
@@ -81,23 +43,12 @@ function handle_vehicle_spawnpoints()
     end
 end
 
-function handle_players()
-    for each player do
-        alias player_vehicle = allocate global.object
-        player_vehicle = current_player.get_vehicle()
-
-        if player_vehicle == no_object then -- If this player doesn't have a vehicle.
-            if current_player.number[2] == 1 then -- Flag: if this player is not allowed to not have a vehicle.
-                -- Volver al punto de guardado anterior, solamente si es que este existe.
-            end
-        end
-    end
-end
-
 do
     handle_vehicle_spawnpoints()
-    --handle_players()
 end
+
+-- Race GT
+
 
 
 -- Vehicle Blinkshot 
@@ -109,8 +60,6 @@ declare object.object[0] -- Flag: determines wether a telporter spawnpoint has a
 
 declare player.object[0] -- Used to store the hill marker, where the vehicle and the players are gonna be teleported.
 declare player.object[1] -- Used to store the vehicles that has to be teleported with the players.
-declare player.object[2] -- Used to store the temporal biped.
-declare player.object[3] -- Used to store the real player's biped.
 
 declare player.number[0] -- Flag: Determines wether the player is prepared to be teleported.
 declare player.number[1] -- Used to count ticks.
@@ -223,8 +172,6 @@ function prepare_players_teleport()
     current_player.number[0] = 1 -- Flag: First part of teleportation completed.
     current_player.number[1] = 0 -- Flag: Set the tick counter to zero.
 
-    current_player.number[2] = 0 -- Flag: this player is allowed to not have a vehicle.
-                
     if current_player.player[0] != no_player then -- If there's a second player on the vehicle.
         temporal_player = current_player.player[0]
 
@@ -232,8 +179,6 @@ function prepare_players_teleport()
         temporal_player.biped.detach() -- Make this player leave his vehicle.
         temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
         temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
-
-        temporal_player.number[2] = 0 -- Flag: this player is allowed to not have a vehicle.
     end
 
     if current_player.player[1] != no_player then -- If there's a third player on the vehicle.
@@ -243,8 +188,6 @@ function prepare_players_teleport()
         temporal_player.biped.detach() -- Make this player leave his vehicle.
         temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
         temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
-
-        temporal_player.number[2] = 0 -- Flag: this player is allowed to not have a vehicle.
     end
 
     previous_vehicle.delete() -- Delete the previous player's vehicle.
@@ -253,32 +196,33 @@ function prepare_players_teleport()
 end
 
 function teleport_players_to_vehicle()
+    alias player_biped = allocate global.object
+    alias temporal_biped = allocate global.object
+
     current_player.number[1] += 1 -- Increase the ticks counter.
 
     if current_player.number[1] == 1 then -- If this is the first tick since teleportation started.
-        current_player.object[2] = current_player.object[1].place_at_me(monitor, none, none, 0, 0, 0, none) -- Create a monitor close to the new vehicle.
-        current_player.object[3] = current_player.biped -- Save the real player's biped.
+        temporal_biped = current_player.object[1].place_at_me(monitor, none, none, 0, 0, 0, none) -- Create a monitor close to the new vehicle.
+        player_biped = current_player.biped -- Save the real player's biped.
                 
-        current_player.set_biped(current_player.object[2]) -- Set the monitor as the new biped of this player.
+        current_player.set_biped(temporal_biped) -- Set the monitor as the new biped of this player.
 
     altif current_player.number[1] == 2 then -- If this is the second tick since teleportation started.
-        current_player.object[3].attach_to(current_player.object[1], 0, 0, 10, relative) -- Move the real player's biped closer to the vehicle.
-        current_player.object[3].detach()
+        player_biped.attach_to(current_player.object[1], 0, 0, 10, relative) -- Move the real player's biped closer to the vehicle.
+        player_biped.detach()
 
-        current_player.set_biped(current_player.object[3]) -- Return the player to it's real biped.
+        current_player.set_biped(player_biped) -- Return the player to it's real biped.
                 
     altif current_player.number[1] == 3 then -- If this is the third tick since teleportation started.
-        current_player.object[2].delete() -- Delete the monitor created.
+        temporal_biped.delete() -- Delete the monitor created.
 
         current_player.force_into_vehicle(current_player.object[1]) -- Force this player into this new vehicle.
         
         current_player.object[1] = no_object -- Clear the player vehicle.
-        current_player.object[2] = no_object -- Clear the temporal player's biped.
-        current_player.object[3] = no_object -- Clear the real player's biped.
+        temporal_biped = no_object -- Clear the temporal player's biped.
+        player_biped = no_object -- Clear the real player's biped.
         current_player.number[0] = 0 -- Clear the 'is prepared to teleport' flag.
         current_player.number[1] = 0 -- Clear the ticks counter.
-
-        current_player.number[2] = 1 -- Flag: This player is not allowed to not have a vehicle.
     end
 end
 
