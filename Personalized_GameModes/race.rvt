@@ -1,7 +1,5 @@
 -- Race 
 
--- Holy fuck I'm gonna have to re-write all this shit.
-
 declare global.number[1] with network priority low
 alias current_checkpoint_number = global.number[1] -- Stores the current player's checkpoint.
 
@@ -37,9 +35,9 @@ declare player.number[3] with network priority local -- Saves this player's curr
 declare player.number[4] with network priority local -- The distance to the next checkpoint.
 declare player.number[5] with network priority local = 1 -- Flag: determines wether a player has a vehicle.
 
-declare player.object[0] with network priority low
+declare player.object[0] with network priority low -- Used to store the player's vehicle.
 
-declare player.player[0] with network priority low
+declare player.player[0] with network priority low -- Used to store the player itself.
 
 declare player.timer[0] = 10
 declare player.timer[2] = 1 -- Used to determine wether the player is ready to start the race.
@@ -52,7 +50,7 @@ declare object.player[0] with network priority low
 declare object.timer[0] = 16 -- ?
 declare object.timer[1] = 2
 
-on init: do
+function initialize()
     global.timer[0].set_rate(-100%) -- ?
 
     for each player do
@@ -152,11 +150,8 @@ function link_player_with_vehicle()
     end
 end
 
-for each player do
-    -- Necessary?
-    --current_player.set_objective_text("Hit checkpoints to complete laps.\r\n%n laps to win.", script_option[0])
-    
-    script_widget[0].set_text("Lap time: %s", hud_player.timer[1]) -- Show the current lap time.
+function handle_start()
+    script_widget[0].set_text("Lap time %s", hud_player.timer[1]) -- Show the current lap time.
 
     if current_player.player[0] == no_player then -- If this player is not saved inside it's own data.
         current_player.number[0] = next_checkpoint.number[0] -- Set the next checkpoint to this player.
@@ -455,32 +450,6 @@ function handle_new_checkpoint()
             end
         end
     end
-end
-
-do
-    handle_distance_traveled()
-end
-
-for each player do
-    set_loadouts()
-    link_player_with_vehicle()
-    set_player_vehicle()
-    handle_player_on_vehicle()
-    handle_laps()
-    handle_player_hud()
-    handle_player_without_vehicle()
-    handle_without_vehicle_timer()
-    handle_end_round()
-    handle_new_winning_player()
-    handle_new_checkpoint()
-end
-
-for each object with label "race_flag" do
-    handle_checkpoint_visibility()
-end
-
-for each object with label "land_mine" do
-    handle_land_mines()
 end
 
 -- Race

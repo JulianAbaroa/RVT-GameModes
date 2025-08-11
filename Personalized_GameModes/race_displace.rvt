@@ -1,15 +1,15 @@
 -- Vehicle Blinkshot 
 
-declare global.object[3]
-alias previous_vehicle = global.object[3] -- Used to store the previous player's vehicle.
+declare global.object[0]
+alias previous_vehicle = global.object[0] -- Used to store the previous player's vehicle.
 
 -- The object.object[0] on vehicle blinkshot is used as a 'flag', and determines wether a telporter spawnpoint has a teleporter.
 
 declare player.object[1] -- Used to store the hill marker, where the vehicle and the players are gonna be teleported.
 declare player.object[2] -- Used to store the vehicles that has to be teleported with the players.
 
-declare player.number[6] -- Flag: Determines wether the player is prepared to be teleported.
-declare player.number[7] -- Used to count ticks.
+declare player.number[0] -- Flag: Determines wether the player is prepared to be teleported.
+declare player.number[1] -- Used to count ticks.
 
 function handle_teleporters_spawnpoint()
     for each object with label "teleporter_spawnpoint" do
@@ -20,12 +20,11 @@ function handle_teleporters_spawnpoint()
             
             if current_object.timer[0] >= 3 then
                 teleporter = current_object.place_at_me(monitor, "teleporter", never_garbage_collect, 0, 0, 0, default)
+                teleporter.object[0] = current_object
 
                 if current_object.spawn_sequence == 0 then
-                    teleporter.set_waypoint_text("Destroy!")
                     teleporter.set_waypoint_visibility(everyone)
                     teleporter.set_waypoint_range(10, 100)
-                    teleporter.set_waypoint_priority(low)
                     teleporter.set_scale(300)
 
                 altif current_object.spawn_sequence == 1 then
@@ -44,7 +43,7 @@ function handle_teleporters_spawnpoint()
     end
 end 
 
-function handle_monitors_health()
+function handle_monitors()
     for each object with label "teleporter" do
         alias monitor_state = allocate global.number
 
@@ -54,8 +53,26 @@ function handle_monitors_health()
         end
 
         monitor_state = current_object.health
-        if monitor_state > 10 then
-            current_object.health = 10
+        if monitor_state > 1 then
+            current_object.health = 1
+        end
+
+        alias teleporter_spawner = allocate global.object
+        teleporter_spawner = current_object.object[0]
+
+        if teleporter_spawner.spawn_sequence == 0 then
+            for each player do
+                alias distance = allocate global.number
+                distance = current_player.biped.get_distance_to(current_object)
+
+                if distance <= 200 then
+                    current_object.set_waypoint_text("Now!")
+                    current_object.set_waypoint_priority(blink)
+                altif distance > 200 then
+                    current_object.set_waypoint_text("Destroy!")
+                    current_object.set_waypoint_priority(low)
+                end
+            end
         end
     end
 end
@@ -117,8 +134,8 @@ function prepare_players_teleport()
 
     current_player.biped.detach() -- Make this player leave his vehicle.
     
-    current_player.number[6] = 1 -- Flag: First part of teleportation completed.
-    current_player.number[7] = 0 -- Flag: Set the tick counter to zero.
+    current_player.number[0] = 1 -- Flag: First part of teleportation completed.
+    current_player.number[1] = 0 -- Flag: Set the tick counter to zero.
 
     if current_player.player[0] != no_player then -- If there's a second player on the vehicle.
         temporal_player = current_player.player[0]
@@ -126,8 +143,8 @@ function prepare_players_teleport()
         temporal_player.object[2] = current_player.object[2] -- Save the vehicle teleported on this player's data.
         temporal_player.biped.detach() -- Make this player leave his vehicle.
 
-        temporal_player.number[6] = 1 -- Flag: First part of teleportation completed.
-        temporal_player.number[7] = 0 -- Flag: Set the tick counter to zero.
+        temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
+        temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
     end
 
     if current_player.player[1] != no_player then -- If there's a third player on the vehicle.
@@ -136,8 +153,8 @@ function prepare_players_teleport()
         temporal_player.object[2] = current_player.object[2] -- Save the vehicle teleported on this player's data.
         temporal_player.biped.detach() -- Make this player leave his vehicle.
 
-        temporal_player.number[6] = 1 -- Flag: First part of teleportation completed.
-        temporal_player.number[7] = 0 -- Flag: Set the tick counter to zero.
+        temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
+        temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
     end
 
     previous_vehicle.delete() -- Delete the previous player's vehicle.
@@ -149,21 +166,21 @@ function teleport_players_to_vehicle()
     alias player_biped = allocate global.object
     alias temporal_biped = allocate global.object
 
-    current_player.number[7] += 1 -- Increase the ticks counter.
+    current_player.number[1] += 1 -- Increase the ticks counter.
 
-    if current_player.number[7] == 1 then -- If this is the first tick since teleportation started.
+    if current_player.number[1] == 1 then -- If this is the first tick since teleportation started.
         temporal_biped = current_player.object[2].place_at_me(monitor, none, none, 0, 0, 0, none) -- Create a monitor close to the new vehicle.
         player_biped = current_player.biped -- Save the real player's biped.
                 
         current_player.set_biped(temporal_biped) -- Set the monitor as the new biped of this player.
 
-    altif current_player.number[7] == 2 then -- If this is the second tick since teleportation started.
+    altif current_player.number[1] == 2 then -- If this is the second tick since teleportation started.
         player_biped.attach_to(current_player.object[2], 0, 0, 10, relative) -- Move the real player's biped closer to the vehicle.
         player_biped.detach()
 
         current_player.set_biped(player_biped) -- Return the player to it's real biped.
                 
-    altif current_player.number[7] == 3 then -- If this is the third tick since teleportation started.
+    altif current_player.number[1] == 3 then -- If this is the third tick since teleportation started.
         temporal_biped.delete() -- Delete the monitor created.
 
         current_player.force_into_vehicle(current_player.object[2]) -- Force this player into this new vehicle.
@@ -172,8 +189,8 @@ function teleport_players_to_vehicle()
         temporal_biped = no_object -- Clear the temporal player's biped.
         player_biped = no_object -- Clear the real player's biped.
 
-        current_player.number[6] = 0 -- Clear the 'is prepared to teleport' flag.
-        current_player.number[7] = 0 -- Clear the ticks counter.
+        current_player.number[0] = 0 -- Clear the 'is prepared to teleport' flag.
+        current_player.number[1] = 0 -- Clear the ticks counter.
     end
 end
 
@@ -197,7 +214,7 @@ function handle_vehicles_teleportation() -- Main function.
             end
         end
 
-        if current_player.number[6] == 1 then
+        if current_player.number[0] == 1 then
             teleport_players_to_vehicle()
         end
     end
@@ -206,7 +223,7 @@ end
 do
     handle_teleporters_spawnpoint()
     handle_vehicles_teleportation()
-    handle_monitors_health()
+    handle_monitors()
 end
 
 on object death: do
@@ -296,471 +313,224 @@ end
 
 
 
+
+
+
+
+
+
+
 -- Checkpoint System: re-write all this shit based on what race gt does.
 
-function handle_checkpoints()
-
+on init: do
+    --for each player do
+    --    current_player.number[2] = -1
+--
+    --    script_widget[1].set_visibility(current_player, false)
+    --    script_widget[2].set_visibility(current_player, false)
+    --end
+--
+    --for each object with label "checkpoint" do
+    --    current_object.team = team[1] -- Puts color to this waypoint.
+--
+    --    current_object.set_spawn_location_permissions(no_one) -- No one can spawn here.
+    --    current_object.set_shape_visibility(no_one) -- Hides this object shape.
+    --    current_object.set_invincibility(1) -- This object is invincible.
+    --    
+    --    current_object.set_waypoint_text("%nm", hud_player.number[5]) -- Shows the distance to the next checkpoint.
+    --    current_object.set_waypoint_visibility(no_one) -- Hides this object waypoint.
+    --    current_object.set_waypoint_priority(blink) -- Sets this waypoint to blink.
+    --    current_object.set_waypoint_icon(diamond) -- Sets this waypoint icon to 'diamond'.
+    --end
 end
 
--- Checkpoint System
+function handle_next_checkpoint()
+    alias next_checkpoint = allocate global.number
+    next_checkpoint = current_player.number[2]
+    next_checkpoint += 1
 
+    alias last_checkpoint = allocate global.number -- Maybe it has to be local.
+    last_checkpoint = 0
 
-
-
-
-
--- Race 
-
-declare global.number[1] with network priority low
-alias current_checkpoint_number = global.number[1] -- Stores the current player's checkpoint.
-
-declare global.number[2] with network priority local 
-alias placeholder = global.number[2] -- Used as a flag/value for many things.
-
-declare global.number[3] with network priority local 
-alias speed_or_scoreboard = global.number[3] -- Stores the player's speed or scoreboard position.
-
-declare global.number[4] with network priority local
-alias next_checkpoint_number = global.number[4] -- Used to store the next player's checkpoint number.
-
-declare global.number[5] with network priority local
-alias temporal_checkpoint = global.number[5] -- Used to store temporarily the next/current checkpoint.
-
-declare global.object[0] with network priority low
-alias next_checkpoint = global.object[0] -- Stores the next player's checkpoint.
-
-declare global.object[1] with network priority local
-alias vehicle_or_checkpoint = global.object[1] -- Stores the current player's vehicle or the player's next checkpoint.
-
-declare global.object[2] with network priority local -- Stores the current player's vehicle.
-
-declare global.player[0] with network priority low -- Stores temporarily winning player on the scoreboard.
-declare global.player[1] with network priority low -- Stores the winning player on the scoreboard.
-
-declare global.timer[0] = 1 -- Used to calculate different things every one second.
-
-declare player.number[0] with network priority low = -1 -- The next player's checkpoint.
-declare player.number[1] with network priority low -- Used to store the current player's lap.
-declare player.number[2] with network priority low -- Flag: determines wheter a player has completed a lap.
-declare player.number[3] with network priority local -- Saves this player's current speed.
-declare player.number[4] with network priority local -- The distance to the next checkpoint.
-declare player.number[5] with network priority local = 1 -- Flag: determines wether a player has a vehicle.
-
-declare player.object[0] with network priority low -- Used to store the player's vehicle.
-
-declare player.player[0] with network priority low -- Used to store the player itself.
-
-declare player.timer[0] = 10
-declare player.timer[2] = 1 -- Used to determine wether the player is ready to start the race.
-
-declare object.number[0] with network priority low -- Checkpoint number.
-declare object.number[1] with network priority low
-
-declare object.player[0] with network priority low
-
-declare object.timer[0] = 16 -- ?
-declare object.timer[1] = 2
-
-function initialize()
-    global.timer[0].set_rate(-100%) -- ?
-
-    for each player do
-        current_player.set_objective_text("Hit checkpoints to complete laps.\r\n%n laps to win.", script_option[0])
-        current_player.script_stat[0] = 3600 -- Set best lap time.
+    for each object with label "checkpoint" do
+        if last_checkpoint < current_object.spawn_sequence then
+            last_checkpoint = current_object.spawn_sequence
+        end
     end
 
-    for each object with label "race_flag" do -- Checkpoints.
-        current_object.number[0] = current_object.spawn_sequence -- Save this checkpoint number.
-        current_object.team = team[1] -- Assing the blue team to this checkpoint.
+    if next_checkpoint > last_checkpoint then
+        current_player.number[2] = -1
+        next_checkpoint = 0
+    end
 
-        current_object.set_waypoint_text("%nm", hud_player.number[4]) -- Shows the distance to the next checkpoint.
-        current_object.set_waypoint_priority(blink)
-        current_object.set_waypoint_icon(diamond)
+    if next_checkpoint == current_object.spawn_sequence then
+        -- Shows this waypoint to this player. 
+        current_object.set_waypoint_visibility(mod_player, current_player, 1)
 
+        -- Shows this object shape to this player.  
+        current_object.set_shape_visibility(mod_player, current_player, 1)
+
+        -- Calculate next checkpoint distance.
+        current_player.number[5] = 0
+        current_player.number[5] = current_player.biped.get_distance_to(current_object)
+        current_player.number[5] *= 7
+        current_player.number[5] /= 23
+    end
+end
+
+function handle_checkpoint_reached()
+    -- Set this checkpoint as the current player's checkpoint.
+    current_player.number[2] = current_object.spawn_sequence
+                
+    -- Hides this waypoint to this player. 
+    current_object.set_waypoint_visibility(mod_player, current_player, 0)
+
+    -- Hides this object shape to this player.
+    current_object.set_shape_visibility(mod_player, current_player, 0)
+
+    -- If this is the first checkpoint.
+    if current_object.spawn_sequence == 0 then
+        current_player.number[4] = 0 -- Reset this flag.
+
+        -- If this is the first player's lap.
+        if current_player.number[3] == 0 then
+            send_incident(race_game_start, current_player, no_player)
+            current_player.timer[0].set_rate(100%)
+            script_widget[1].set_visibility(current_player, true)
+            script_widget[2].set_visibility(current_player, true)
+            
+            -- If this is not the first player's lap.
+        altif current_player.number[3] > 0 then
+            alias last_lap = allocate global.number
+            last_lap = script_option[0]
+            last_lap -= 1
+
+            -- If this is not the last lap.
+            if current_player.number[3] != last_lap then
+                -- This player has completed a lap.
+                send_incident(lap_complete, current_player, no_player)
+                game.show_message_to(current_player, none, "Lap Complete.")
+                current_player.timer[0].reset()
+
+            -- If this is the last lap.
+            altif current_player.number[3] == last_lap then
+                -- This player is on the final lap.
+                send_incident(final_lap, current_player, all_players)
+                game.show_message_to(current_player, none, "Final lap.")
+            end
+        end
+        
+        current_player.number[3] += 1 -- Increase this player's lap counter.
+
+    altif current_object.spawn_sequence > 0 then
+        send_incident(checkpoint_reached_team, current_player, no_player)
+    end
+
+    alias last_checkpoint = allocate global.number -- Maybe it has to be local.
+    last_checkpoint = 0
+
+    for each object with label "checkpoint" do
+        if last_checkpoint < current_object.spawn_sequence then
+            last_checkpoint = current_object.spawn_sequence
+        end
+    end
+
+    if current_object.spawn_sequence == last_checkpoint then
+        current_player.number[4] = 1 -- Flag: this player just passed the last checkpoint.
+    end
+end
+
+function handle_checkpoint_respawn()
+    -- If this checkpoint is the current player's checkpoint.
+    if current_object.spawn_sequence == current_player.number[2] then
+        -- Convert this object as the only respawn point for this player.
+        current_object.set_spawn_location_permissions(mod_player, current_player, 1)
+        current_player.set_primary_respawn_object(current_object)
+
+        -- If this player is not being teleportated.
+        if current_player.number[0] == 0 then
+            current_player.object[0] = current_player.get_vehicle()
+            
+            if current_player.object[0] == no_object then
+                save_players_on_same_vehicle()
+    
+                if current_player.player[0] == no_player and current_player.player[1] == no_player then
+                    current_player.object[0] = current_player.biped.place_at_me(ghost, none, none, 0, 0, 0, none)
+                end
+                
+                if current_player.player[0] != no_player and current_player.player[1] == no_player then
+                    current_player.object[0] = current_player.biped.place_at_me(revenant, none, none, 0, 0, 0, none)
+                    
+                    current_player.player[0].force_into_vehicle(current_player.object[0])
+                end
+
+                if current_player.player[0] != no_player and current_player.player[1] != no_player then
+                    current_player.object[0] = current_player.biped.place_at_me(warthog, none, none, 0, 0, 0, none)
+                    
+                    current_player.player[0].force_into_vehicle(current_player.object[0])
+                    current_player.player[1].force_into_vehicle(current_player.object[0])
+                end
+                
+                current_player.force_into_vehicle(current_player.object[0])
+
+                clear_saved_players()
+            end
+        end
+    
+    -- If this checkpoint is not the current player's checkpoint.
+    altif current_object.spawn_sequence != current_player.number[2] then
+        current_object.set_spawn_location_permissions(mod_player, current_player, 0)
+    end
+end
+
+function handle_checkpoints()
+    for each object with label "checkpoint" do
         current_object.set_spawn_location_permissions(no_one)
         current_object.set_invincibility(1)
 
-        if current_object.number[0] == 1 then -- If this is the second checkpoint.
-            next_checkpoint = current_object -- Set this checkpoint as the next checkpoint.
+        handle_next_checkpoint()
 
-            current_object.set_waypoint_visibility(no_one)
-            current_object.set_shape_visibility(no_one)
-        end
-    end
-
-    for each object with label "race_flag" do
-        -- If the next checkpoint doesn't exists or (?)
-        if next_checkpoint == no_object or next_checkpoint.number[0] > current_object.number[0] then 
-            next_checkpoint = current_object -- Set this checkpoint as the current checkpoint (?).
-        end
-    end
-
-    for each object with label "race_flag" do
-        if current_object.number[0] > current_checkpoint_number then -- If this checkpoint number is higher than the previous checkpoint stored.
-            current_checkpoint_number = current_object.number[0] -- Set the checkpoint number to the current checkpoint storer.
-        end
-    end
-end
-
-function set_loadouts()
-    if current_player.is_elite() then 
-        current_player.set_loadout_palette(elite_tier_1)
-    end
-
-    if not current_player.is_elite() then 
-        current_player.set_loadout_palette(spartan_tier_1)
-    end
-end
-
-function handle_checkpoint_visibility()
-    current_object.set_shape_visibility(no_one) -- Hide all checkpoint shapes.
-
-    for each player do
-        if current_object.number[0] == current_player.number[0] then -- If this player next checkpoint is this checkpoint.
-            current_object.set_shape_visibility(mod_player, current_player, 1) -- Show this checkpoint to this player.
-        end
-    end
-end
-
-function set_player_vehicle()
-    if current_player.object[0] == no_object then -- If this player doesn't have a vehicle.
-        vehicle_or_checkpoint = no_object -- Clear the stored player vehicle.
-
-        if script_option[1] == 1 then -- Create a mongoose for this player.
-            vehicle_or_checkpoint = current_player.biped.place_at_me(mongoose, none, none, 0, 0, 0, none)
-        end
-
-        if script_option[1] == 2 then -- Create a warthog for this player.
-            vehicle_or_checkpoint = current_player.biped.place_at_me(warthog, none, none, 0, 0, 0, none)
-        end
-
-        if script_option[1] == 3 then -- Create a ghost for this player.
-            vehicle_or_checkpoint = current_player.biped.place_at_me(ghost, none, none, 0, 0, 0, none)
-        end
-
-        if script_option[1] == 4 then -- Create a banshee for this player.
-            vehicle_or_checkpoint = current_player.biped.place_at_me(banshee, none, none, 0, 0, 0, none)
-        end
-
-        current_player.object[0] = vehicle_or_checkpoint -- Save this vehicle inside the player's data.
-
-        vehicle_or_checkpoint.player[0] = current_player -- Save this player inside the vehicle's data.
-        vehicle_or_checkpoint.team = current_player.team -- Set this vehicle's team the same as the player's team.
-
-        current_player.force_into_vehicle(current_player.object[0]) -- Force this player on this vehicle.
-    end
-end
-
-function link_player_with_vehicle()
-    vehicle_or_checkpoint = no_object -- Clear the player's vehicle.
-    vehicle_or_checkpoint = current_player.get_vehicle() -- Get the current player's vehicle.
-
-    if vehicle_or_checkpoint != no_object then -- If this player has a vehicle.
-        current_player.object[0] = vehicle_or_checkpoint -- Save this vechile inside this player's data.
-        vehicle_or_checkpoint.player[0] = current_player -- Save this player inside this vehicle's data.
-    end
-end
-
-function handle_start()
-    script_widget[0].set_text("Lap time %s", hud_player.timer[1]) -- Show the current lap time.
-
-    if current_player.player[0] == no_player then -- If this player is not saved inside it's own data.
-        current_player.number[0] = next_checkpoint.number[0] -- Set the next checkpoint to this player.
-        current_player.player[0] = current_player -- Save this player inside it's own data.
-    end
-
-    if current_player.timer[2] != 10 then
-        current_player.timer[2].set_rate(-100%)
-    end
-
-    -- If this player hans't started the race and is prepared to start the race.
-    if current_player.timer[2].is_zero() then 
-        send_incident(race_game_start, current_player, no_player)
-        current_player.script_stat[0] = 3600
-
-        current_player.timer[2].set_rate(0%)
-        current_player.timer[2] = 10
-    end
-end
-
-function handle_distance_traveled()
-    global.timer[0].set_rate(-100%)
-
-    if global.timer[0].is_zero() then
-        for each player do
-            placeholder = 1 -- Flag: the race started.
-
-            speed_or_scoreboard = current_player.number[3] -- Set the player's current speed inside this variable.
-
-            placeholder *= speed_or_scoreboard -- Multiply the player's speed with 1.
-            placeholder *= 109 -- Multiply the player's speed with 109.
-            placeholder /= 100 -- Divide it with 100.
-
-            current_player.script_stat[2] += placeholder -- Save the result as the top speed reached by this player.
-        end
-        
-        global.timer[0].reset()
-    end
-end
-
-function handle_player_on_vehicle()
-    current_player.set_co_op_spawning(true)
-    current_player.biped.set_spawn_location_permissions(no_one)
-
-    placeholder = 0
-
-    if current_player.number[5] == 1 then -- If this player has a vehicle.
-        for each object with label "race_flag" do
-            -- If this checkpoint it's the next player's checkpoint.
-            if current_object.number[0] == current_player.number[0] then 
-                current_object.set_waypoint_visibility(mod_player, current_player, 1) -- Show this checkpoint to this player.
-                
-                -- If this player's is inside this checkpoint.
+        -- If this player hasn't reached this and the last checkpoint.
+        if current_player.number[2] < current_object.spawn_sequence then
+            -- If this is the first checkpoint or the player haven't reached the last checkpoint.
+            if current_object.spawn_sequence == 0 or current_player.number[4] == 0 then
+                -- If this checkpoint's shape contains this player.
                 if current_object.shape_contains(current_player.biped) then
-                    current_object.set_waypoint_visibility(mod_player, current_player, 0) -- Hide this checkpoint to this player.
-                    placeholder = 1 -- Flag: this player has reached a checkpoint.
+                    handle_checkpoint_reached()
                 end
             end
         end
 
-        if placeholder == 1 then -- If this player has reached a checkpoint.
-            current_player.score += 1 -- Increase this player's score.
-
-            send_incident(checkpoint_reached_team, current_player, no_player)
-
-            speed_or_scoreboard = 0 -- Resets this flag value.
-
-            do
-                speed_or_scoreboard = current_player.get_scoreboard_pos() -- Stores this player's scoreboard position.
-
-                -- If this player is on the first position and the previous player winning is different from this player.
-                if speed_or_scoreboard == 1 and global.player[1] != current_player then
-                    global.player[0] = current_player -- Store the new first player.
-                    global.player[1].score -= 1 -- Decrease the previous winning player's score.
-                end
-            end
-
-            next_checkpoint_number = current_player.number[0] -- Store the next player's checkpoint on this variable.
-            temporal_checkpoint = current_checkpoint_number -- Set the current checkpoint on this variable.
-            temporal_checkpoint += 1
-
-            for each object with label "race_flag" do
-                --If this checkpoint is higher than the next player's checkpoint.
-                if current_object.number[0] > current_player.number[0] then
-                    -- If this checkpoint is lower than next checkpoint.
-                    if current_object.number[0] < temporal_checkpoint then 
-                        temporal_checkpoint = current_object.number[0] -- Stores the current checkpoint number on next checkpoint.
-                    end 
-                end
-            end
-
-            current_player.number[0] = temporal_checkpoint -- Set the next player's checkpoint with current checkpoint.
-
-            -- If the next player's checkpoint is higher than the previous checkpoint stored.
-            if current_player.number[0] > current_checkpoint_number then 
-                current_player.number[2] = 1 -- Flag: (?)
-                current_player.number[0] = next_checkpoint.number[0] -- Set the next player's checkpoint as the next checkpoint number saved.
-            end
-
-            for each object with label "race_flag" do
-                current_object.set_spawn_location_permissions(mod_player, current_player, 0) -- Hide this checkpoint to this player.
-                
-                -- If this checkpoint it's the next player's checkpoint.
-                if current_object.number[0] == current_player.number[0] then 
-                    current_object.set_waypoint_visibility(mod_player, current_player, 1) -- Show this checkpoint to this player.
-                end
-            end
-
-            for each object with label "race_flag" do
-                -- If this checkpoints is the next player's checkpoint.
-                if current_object.number[0] == next_checkpoint_number then 
-                    -- Make this player spawn at this checkpoint.
-                    current_object.set_spawn_location_permissions(mod_player, current_player, 1) 
-                    current_player.set_primary_respawn_object(current_object)
-                    current_object.set_waypoint_visibility(mod_player, current_player, 0) -- Hide this checkpoint to this player.
-                end
-            end
-        end
+        handle_checkpoint_respawn()
     end
 end
 
 function handle_laps()
-    current_player.timer[1].set_rate(100%)
+    alias last_lap = allocate global.number
+    last_lap = script_option[0]
 
-    if current_player.number[2] == 1 then -- If this player has completed a lap.
-        game.show_message_to(current_player, none, "Lap Complete.")
-        send_incident(lap_complete, current_player, no_player)
+    alias current_lap = allocate global.number
+    current_lap = current_player.number[3]  
 
-        current_player.number[1] += 1 -- Increase the laps completed by this player.
-
-        if current_player.number[1] == 1 then -- If this is the first lap completed by this player.
-            current_player.script_stat[0] = current_player.timer[1] -- Store the time of this lap time.
-        end
-
-        -- If this is not the first lap of this player.
-        if current_player.number[1] != 1 then
-            -- If this lap time is lower than the previous time saved.
-            if current_player.timer[1] < current_player.script_stat[0] then 
-                current_player.script_stat[0] = current_player.timer[1] -- Save the new best lap time.
-                game.show_message_to(current_player, none, "New best lap time!")
-            end
-        end
-
-        current_player.timer[1].reset() -- Reset the lap timer.
-
-        do
-            placeholder = script_option[0]
-            placeholder -= 1
-
-            -- If this lap is the final lap.
-            if current_player.number[1] == placeholder then 
-                speed_or_scoreboard = 0
-                speed_or_scoreboard = current_player.get_scoreboard_pos()
-                
-                -- If this is the winning player.
-                if speed_or_scoreboard == 1 then 
-                    send_incident(final_lap, current_player, all_players)
-                end
-            end
-        end
-
-        current_player.number[2] = 0
-    end
+    script_widget[1].set_text("Lap %n/%n", current_lap, last_lap)
 end
 
-function handle_player_hud()
-    script_widget[0].set_visibility(current_player, false)
-
-    vehicle_or_checkpoint = current_player.biped
-    
-    if vehicle_or_checkpoint != no_object then 
-        script_widget[0].set_visibility(current_player, true)
-    end
+for each player do
+    --current_player.set_co_op_spawning(true)
+    --current_player.biped.set_spawn_location_permissions(no_one)
+--
+    --handle_checkpoints()
+    --handle_laps()
+--
+    --alias lap_time = allocate global.timer
+    --lap_time = current_player.timer[0]
+--
+    --script_widget[2].set_text("Lap time %n", lap_time)
+--
+    ---- If this player has completed all the laps.
+    --if current_player.number[3] >= script_option[0] then
+    --    game.end_round()
+    --end
 end
 
-function handle_player_without_vehicle()
-    vehicle_or_checkpoint = no_object
-
-    current_player.number[5] = 1 -- Flag: this player have a vehicle.
-
-    vehicle_or_checkpoint = current_player.get_vehicle()
-
-    if vehicle_or_checkpoint == no_object then -- If this player doesn't have a vehicle.
-        script_widget[0].set_visibility(current_player, false)
-
-        current_player.number[5] = 0 -- Flag: this player doesn't have a vehicle.
-
-        current_player.timer[0].set_rate(-100%) -- Decrease timer to force this player into a new vehicle.
-
-        if current_player.timer[0].is_zero() then 
-            do
-                global.object[2] = current_player.object[0] -- Store the player's vehicle inside this variable
-                
-                -- If this vehicle has stored this player or this vehicle doesn't have a player stored.
-                if global.object[2].player[0] == current_player or global.object[2].player[0] == no_player then 
-                    current_player.object[0].delete() -- Delete this vehicle.
-                end
-            end
-
-            current_player.object[0] = no_object -- This player doesn't have a vehicle.
-            current_player.timer[0].reset()
-
-            game.show_message_to(current_player, announce_race, "On foot for too long!")
-        end
-    end
-end
-
-function handle_without_vehicle_timer()
-    vehicle_or_checkpoint = no_object
-    vehicle_or_checkpoint = current_player.get_vehicle()
-
-    if vehicle_or_checkpoint != no_object then -- If this player is on a vehicle.
-        current_player.timer[0].reset()
-    end
-end
-
-function handle_land_mines()
-    -- If the land mine option is disabled.
-    if script_option[2] == 0 then 
-        current_object.delete() -- Delete this object.
-    end
-
-    current_object.set_waypoint_visibility(everyone)
-    current_object.set_waypoint_priority(low)
-    current_object.set_waypoint_range(0, 20)
-    current_object.set_shape(sphere, 10)
-    current_object.set_shape_visibility(no_one)
-
-    vehicle_or_checkpoint = current_object
-
-    for each player do
-        if vehicle_or_checkpoint.number[1] == 0 and vehicle_or_checkpoint.shape_contains(current_player.biped) then 
-            vehicle_or_checkpoint.number[1] = 1
-            vehicle_or_checkpoint.timer[1].set_rate(-100%)
-            vehicle_or_checkpoint.set_waypoint_priority(blink)
-            vehicle_or_checkpoint.set_waypoint_icon(bomb)
-        end
-    end
-
-    if current_object.timer[1].is_zero() then 
-        current_object.kill(false)
-    end
-end
-
-function handle_end_round()
-    -- If this player's lap are higher than the total laps.
-    if current_player.number[1] > script_option[0] then 
-        game.end_round()
-    end
-
-    if game.round_time_limit > 0 and game.round_timer.is_zero() then 
-        game.end_round()
-    end
-end
-
-function get_checkpoint_distance()
-    vehicle_or_checkpoint = no_object
-
-    for each object with label "race_flag" do
-        -- If this checkpoint is the same as the current player's next checkpoint.
-        if current_object.number[0] == current_player.number[0] then 
-            -- Save this checkpoint inside this variable.
-            vehicle_or_checkpoint = current_object
-        end
-    end
-
-    current_player.number[4] = 0
-    current_player.number[4] = current_player.biped.get_distance_to(vehicle_or_checkpoint)
-    current_player.number[4] *= 7
-    current_player.number[4] /= 23
-end
-
-on local: do
-    for each player do
-        --current_player.number[3] = current_player.biped.get_speed()
-        --get_checkpoint_distance()
-    end
-end
-
-function handle_new_winning_player()
-    if current_player == global.player[0] then -- If this player is the winning player.
-        current_player.score += 1 -- Increase this player's score.
-        global.player[1] = current_player -- Store it on this variable.
-        global.player[0] = no_player -- Clear this variable.
-    end
-end
-
-function handle_new_checkpoint()
-    -- If this player's next checkpoint is the same as the next checkpoint.
-    if current_player.number[0] == next_checkpoint.number[0] then 
-        for each object with label "race_flag" do
-            -- If this player's next checkpoint is the same as this checkpoint number.
-            if current_object.number[0] == current_player.number[0] then 
-                current_object.set_spawn_location_permissions(mod_player, current_player, 1)
-                current_player.set_primary_respawn_object(current_object)
-            end
-        end
-    end
-end
-
--- Race
+-- Checkpoint System
