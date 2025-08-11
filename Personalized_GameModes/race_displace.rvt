@@ -1,12 +1,14 @@
--- Vehicle Blinkshot 
+-- Vehicle Blinkshot
 
 declare global.object[0]
 alias previous_vehicle = global.object[0] -- Used to store the previous player's vehicle.
 
--- The object.object[0] on vehicle blinkshot is used as a 'flag', and determines wether a telporter spawnpoint has a teleporter.
+-- object.object[0] is a flag that determines wether a telporter spawnpoint has a teleporter.
 
-declare player.object[1] -- Used to store the hill marker, where the vehicle and the players are gonna be teleported.
-declare player.object[2] -- Used to store the vehicles that has to be teleported with the players.
+declare player.object[0] -- Used to store the hill marker, where the vehicle and the players are gonna be teleported.
+declare player.object[1] -- Used to store the vehicles that has to be teleported with the players.
+declare player.object[2] -- Used to store the temporal biped.
+declare player.object[3] -- Used to store the real player's biped.
 
 declare player.number[0] -- Flag: Determines wether the player is prepared to be teleported.
 declare player.number[1] -- Used to count ticks.
@@ -43,7 +45,7 @@ function handle_teleporters_spawnpoint()
     end
 end 
 
-function handle_monitors()
+function handle_monitors_health()
     for each object with label "teleporter" do
         alias monitor_state = allocate global.number
 
@@ -81,14 +83,14 @@ function save_players_on_same_vehicle()
     alias this_player = allocate global.player
 
     this_player = current_player
-    this_player.object[2] = current_player.get_vehicle()
+    this_player.object[1] = current_player.get_vehicle()
 
-    if this_player.object[2] != no_object then -- If this player has a vehicle.
+    if this_player.object[1] != no_object then -- If this player has a vehicle.
         for each player do
             if this_player != current_player then -- If the current player is different from 'this_player'.
-                current_player.object[2] = current_player.get_vehicle() -- Save the current player's vehicle.
+                current_player.object[1] = current_player.get_vehicle() -- Save the current player's vehicle.
         
-                if this_player.object[2] == current_player.object[2] then -- If this two players are on the same vehicle.
+                if this_player.object[1] == current_player.object[1] then -- If this two players are on the same vehicle.
                     if this_player.player[0] == no_player then 
                         this_player.player[0] = current_player -- Save the current player inside 'this_player'.
 
@@ -98,7 +100,7 @@ function save_players_on_same_vehicle()
                         end
                     end
 
-                altif this_player.object[2] != current_player.object[2] then -- If these player are not in the same vehicle.
+                altif this_player.object[1] != current_player.object[1] then -- If these player are not in the same vehicle.
                     if this_player.player[0] == current_player then -- If the current player is saved inside 'this_player' data.
                         this_player.player[0] = no_player -- Remove it.
                     
@@ -113,36 +115,34 @@ end
 
 function create_new_vehicle()
     if previous_vehicle.is_of_type(warthog) then -- If this player is on a warthog.
-        current_player.object[2] = current_player.object[1].place_at_me(warthog, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(warthog, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
 
     altif previous_vehicle.is_of_type(ghost) then -- If this player is on a ghost.
-        current_player.object[2] = current_player.object[1].place_at_me(ghost, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(ghost, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
                 
     altif previous_vehicle.is_of_type(revenant) then -- If this player is on a revenant.
-        current_player.object[2] = current_player.object[1].place_at_me(revenant, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(revenant, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
                 
     altif previous_vehicle.is_of_type(mongoose) then -- If this player is on a mongoose.
-        current_player.object[2] = current_player.object[1].place_at_me(mongoose, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(mongoose, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
     end
 
-    current_player.object[1].delete() -- Delete the hill marker saved on this variable.
-    current_player.object[1] = no_object -- Clear this variable.
+    current_player.object[0].delete() -- Delete the hill marker saved on this variable.
+    current_player.object[0] = no_object -- Clear this variable.
 end
 
 function prepare_players_teleport()
     alias temporal_player = allocate global.player
 
     current_player.biped.detach() -- Make this player leave his vehicle.
-    
     current_player.number[0] = 1 -- Flag: First part of teleportation completed.
     current_player.number[1] = 0 -- Flag: Set the tick counter to zero.
-
+                
     if current_player.player[0] != no_player then -- If there's a second player on the vehicle.
         temporal_player = current_player.player[0]
 
-        temporal_player.object[2] = current_player.object[2] -- Save the vehicle teleported on this player's data.
+        temporal_player.object[1] = current_player.object[1] -- Save the vehicle teleported on this player's data.
         temporal_player.biped.detach() -- Make this player leave his vehicle.
-
         temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
         temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
     end
@@ -150,9 +150,8 @@ function prepare_players_teleport()
     if current_player.player[1] != no_player then -- If there's a third player on the vehicle.
         temporal_player = current_player.player[1]
 
-        temporal_player.object[2] = current_player.object[2] -- Save the vehicle teleported on this player's data.
+        temporal_player.object[1] = current_player.object[1] -- Save the vehicle teleported on this player's data.
         temporal_player.biped.detach() -- Make this player leave his vehicle.
-
         temporal_player.number[0] = 1 -- Flag: First part of teleportation completed.
         temporal_player.number[1] = 0 -- Flag: Set the tick counter to zero.
     end
@@ -163,32 +162,29 @@ function prepare_players_teleport()
 end
 
 function teleport_players_to_vehicle()
-    alias player_biped = allocate global.object
-    alias temporal_biped = allocate global.object
-
     current_player.number[1] += 1 -- Increase the ticks counter.
 
     if current_player.number[1] == 1 then -- If this is the first tick since teleportation started.
-        temporal_biped = current_player.object[2].place_at_me(monitor, none, none, 0, 0, 0, none) -- Create a monitor close to the new vehicle.
-        player_biped = current_player.biped -- Save the real player's biped.
+        current_player.object[2] = no_object
+        current_player.object[2] = current_player.object[1].place_at_me(monitor, none, none, 0, 0, 0, none) -- Create a monitor close to the new vehicle.
+        current_player.object[3] = current_player.biped -- Save the real player's biped.
                 
-        current_player.set_biped(temporal_biped) -- Set the monitor as the new biped of this player.
+        current_player.set_biped(current_player.object[2]) -- Set the monitor as the new biped of this player.
 
     altif current_player.number[1] == 2 then -- If this is the second tick since teleportation started.
-        player_biped.attach_to(current_player.object[2], 0, 0, 10, relative) -- Move the real player's biped closer to the vehicle.
-        player_biped.detach()
+        current_player.object[3].attach_to(current_player.object[1], 0, 0, 10, relative) -- Move the real player's biped closer to the vehicle.
+        current_player.object[3].detach()
 
-        current_player.set_biped(player_biped) -- Return the player to it's real biped.
+        current_player.set_biped(current_player.object[3]) -- Return the player to it's real biped.
                 
     altif current_player.number[1] == 3 then -- If this is the third tick since teleportation started.
-        temporal_biped.delete() -- Delete the monitor created.
+        current_player.object[2].delete() -- Delete the monitor created.
 
-        current_player.force_into_vehicle(current_player.object[2]) -- Force this player into this new vehicle.
+        current_player.force_into_vehicle(current_player.object[1]) -- Force this player into this new vehicle.
         
-        current_player.object[2] = no_object -- Clear the player vehicle.
-        temporal_biped = no_object -- Clear the temporal player's biped.
-        player_biped = no_object -- Clear the real player's biped.
-
+        current_player.object[1] = no_object -- Clear the player vehicle.
+        current_player.object[2] = no_object -- Clear the temporal player's biped.
+        current_player.object[3] = no_object -- Clear the real player's biped.
         current_player.number[0] = 0 -- Clear the 'is prepared to teleport' flag.
         current_player.number[1] = 0 -- Clear the ticks counter.
     end
@@ -203,11 +199,11 @@ function handle_vehicles_teleportation() -- Main function.
     for each player do
         clear_saved_players()
 
-        if current_player.object[1] != no_object then -- If this player on a vehicle destroyed a monitor.
+        if current_player.object[0] != no_object then -- If this player on a vehicle destroyed a monitor.
             save_players_on_same_vehicle()
 
-            if current_player.object[2] != no_object then -- If this player is on a vehicle.
-                previous_vehicle = current_player.object[2] -- Save the previous vehicle of this player.
+            if current_player.object[1] != no_object then -- If this player is on a vehicle.
+                previous_vehicle = current_player.object[1] -- Save the previous vehicle of this player.
 
                 create_new_vehicle()
                 prepare_players_teleport()
@@ -223,25 +219,25 @@ end
 do
     handle_teleporters_spawnpoint()
     handle_vehicles_teleportation()
-    handle_monitors()
+    handle_monitors_health()
 end
 
 on object death: do
     if killed_object.has_forge_label("teleporter") then -- If the object destroyed has the "teleporter" label.
         alias distance = allocate global.number
         distance = killed_object.get_distance_to(killer_player.biped)
-
+        
         if distance <= 200 then
             alias temporal_vehicle = allocate global.object
             temporal_vehicle = killer_player.get_vehicle() -- Get the current player's vehicle.
-    
+
             if temporal_vehicle != no_object then -- If this player has a vehicle.
-                killer_player.object[1] = killed_object.place_at_me(hill_marker, none, never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
-    
+                killer_player.object[0] = killed_object.place_at_me(hill_marker, none, never_garbage_collect, 0, 0, 0, none) -- Create the object where the player it's going to attach/teleport.
+
             altif temporal_vehicle == no_object then -- If this player doesn't have a vehicle.
-                killer_player.object[1] = no_object -- Cleaning.
+                killer_player.object[0] = no_object -- Cleaning.
             end
-    
+            
             temporal_vehicle = no_object -- Cleaning.
             script_widget[0].set_visibility(killer_player, false)
 
@@ -322,26 +318,35 @@ end
 
 -- Checkpoint System: re-write all this shit based on what race gt does.
 
+declare global.number[0] = 0
+alias empty_fireteam = global.number[0]
+
+declare global.number[1] = 0
+alias candidate = global.number[1]
+
+declare global.number[2] = 0
+alias is_occupied = global.number[2]
+
 on init: do
-    --for each player do
-    --    current_player.number[2] = -1
---
-    --    script_widget[1].set_visibility(current_player, false)
-    --    script_widget[2].set_visibility(current_player, false)
-    --end
---
-    --for each object with label "checkpoint" do
-    --    current_object.team = team[1] -- Puts color to this waypoint.
---
-    --    current_object.set_spawn_location_permissions(no_one) -- No one can spawn here.
-    --    current_object.set_shape_visibility(no_one) -- Hides this object shape.
-    --    current_object.set_invincibility(1) -- This object is invincible.
-    --    
-    --    current_object.set_waypoint_text("%nm", hud_player.number[5]) -- Shows the distance to the next checkpoint.
-    --    current_object.set_waypoint_visibility(no_one) -- Hides this object waypoint.
-    --    current_object.set_waypoint_priority(blink) -- Sets this waypoint to blink.
-    --    current_object.set_waypoint_icon(diamond) -- Sets this waypoint icon to 'diamond'.
-    --end
+    for each player do
+        current_player.number[2] = -1
+
+        script_widget[1].set_visibility(current_player, false)
+        script_widget[2].set_visibility(current_player, false)
+    end
+
+    for each object with label "checkpoint" do
+        current_object.team = team[1] -- Puts color to this waypoint.
+
+        current_object.set_spawn_location_permissions(no_one) -- No one can spawn here.
+        current_object.set_shape_visibility(no_one) -- Hides this object shape.
+        current_object.set_invincibility(1) -- This object is invincible.
+        
+        current_object.set_waypoint_text("%nm", hud_player.number[5]) -- Shows the distance to the next checkpoint.
+        current_object.set_waypoint_visibility(no_one) -- Hides this object waypoint.
+        current_object.set_waypoint_priority(blink) -- Sets this waypoint to blink.
+        current_object.set_waypoint_icon(diamond) -- Sets this waypoint icon to 'diamond'.
+    end
 end
 
 function handle_next_checkpoint()
@@ -378,6 +383,64 @@ function handle_next_checkpoint()
     end
 end
 
+function save_player_vehicle()
+    alias player_vehicle = allocate global.object
+    player_vehicle = current_player.get_vehicle()
+
+    if player_vehicle.is_of_type(ghost) then
+        current_player.number[6] = 1 -- This player has a ghost.
+
+    altif player_vehicle.is_of_type(mongoose) then
+        current_player.number[6] = 2 -- This player has a mongoose.
+    
+    altif player_vehicle.is_of_type(revenant) then
+        current_player.number[6] = 3 -- This player has a revenant.
+    
+    altif player_vehicle.is_of_type(warthog) then
+        current_player.number[6] = 4 -- This player has a warthog.
+    end
+end
+
+function get_empty_fireteam()
+    alias player_fireteam = allocate global.number
+
+    if candidate == 0 then
+        candidate = 1
+    end
+
+    is_occupied = 0
+
+    for each player do
+        player_fireteam = current_player.get_fireteam()
+
+        if player_fireteam == candidate then
+            is_occupied = 1
+        end
+    end
+
+    if is_occupied == 0 then
+        empty_fireteam = candidate
+    end
+
+    if is_occupied == 1 then
+        candidate += 1
+
+        if candidate < 8 then
+            get_empty_fireteam()
+        end
+    end
+end
+
+function set_player_fireteam()
+    save_players_on_same_vehicle()
+
+    current_player.set_fireteam(empty_fireteam)
+    current_player.player[0].set_fireteam(empty_fireteam)
+    current_player.player[1].set_fireteam(empty_fireteam)
+
+    clear_saved_players()
+end
+
 function handle_checkpoint_reached()
     -- Set this checkpoint as the current player's checkpoint.
     current_player.number[2] = current_object.spawn_sequence
@@ -398,7 +461,10 @@ function handle_checkpoint_reached()
             current_player.timer[0].set_rate(100%)
             script_widget[1].set_visibility(current_player, true)
             script_widget[2].set_visibility(current_player, true)
-            
+
+            save_player_vehicle()
+            set_player_fireteam()
+
             -- If this is not the first player's lap.
         altif current_player.number[3] > 0 then
             alias last_lap = allocate global.number
@@ -448,34 +514,65 @@ function handle_checkpoint_respawn()
         current_player.set_primary_respawn_object(current_object)
 
         -- If this player is not being teleportated.
-        if current_player.number[0] == 0 then
-            current_player.object[0] = current_player.get_vehicle()
-            
-            if current_player.object[0] == no_object then
-                save_players_on_same_vehicle()
-    
-                if current_player.player[0] == no_player and current_player.player[1] == no_player then
-                    current_player.object[0] = current_player.biped.place_at_me(ghost, none, none, 0, 0, 0, none)
+        if current_player.number[0] == 0  then
+            current_player.object[2] = no_object
+            current_player.object[2] = current_player.get_vehicle()
+
+            -- If this player doesn't have a vehicle.
+            if current_player.object[2] == no_object then
+                -- If this player had a ghost.
+                if current_player.number[6] == 1 then
+                    current_player.object[2] = current_object.place_at_me(ghost, none, none, 0, 0, 0, none)
+
+                -- If this player had a mongoose.
+                altif current_player.number[6] == 2 then
+                    current_player.object[2] = current_object.place_at_me(mongoose, none, none, 0, 0, 0, none)
+                
+                -- If this player had a revenant.
+                altif current_player.number[6] == 3 then
+                    current_player.object[2] = current_object.place_at_me(revenant, none, none, 0, 0, 0, none)
+                
+                -- If this player had a warthog.
+                altif current_player.number[6] == 4 then
+                    current_player.object[2] = current_object.place_at_me(warthog, none, none, 0, 0, 0, none)
                 end
                 
-                if current_player.player[0] != no_player and current_player.player[1] == no_player then
-                    current_player.object[0] = current_player.biped.place_at_me(revenant, none, none, 0, 0, 0, none)
-                    
-                    current_player.player[0].force_into_vehicle(current_player.object[0])
-                end
+                current_player.force_into_vehicle(current_player.object[2])
 
-                if current_player.player[0] != no_player and current_player.player[1] != no_player then
-                    current_player.object[0] = current_player.biped.place_at_me(warthog, none, none, 0, 0, 0, none)
-                    
-                    current_player.player[0].force_into_vehicle(current_player.object[0])
-                    current_player.player[1].force_into_vehicle(current_player.object[0])
-                end
-                
-                current_player.force_into_vehicle(current_player.object[0])
+                alias this_player = allocate global.player
+                this_player = current_player
 
-                clear_saved_players()
+                alias this_player_fireteam = allocate global.number
+                this_player_fireteam = current_player.get_fireteam()
+
+                for each player do
+                    if current_player != this_player then
+                        alias player_fireteam = allocate global.number
+                        player_fireteam = current_player.get_fireteam()
+
+                        if player_fireteam == this_player_fireteam then
+                            alias player_vehicle = allocate global.object
+                            player_vehicle = current_player.get_vehicle()
+
+                            if player_vehicle == no_object then
+                                current_player.force_into_vehicle(this_player.object[2])
+                                
+                            altif player_vehicle != no_object then
+                                if player_vehicle != this_player.object[2] then
+                                    current_player.biped.detach()
+                                    current_player.force_into_vehicle(this_player.object[2])
+
+                                    player_vehicle.delete()
+                                    player_vehicle = no_object
+                                end
+                            end
+                        end
+                    end
+                end
             end
         end
+
+        current_player.object[2] = no_object
     
     -- If this checkpoint is not the current player's checkpoint.
     altif current_object.spawn_sequence != current_player.number[2] then
@@ -501,7 +598,9 @@ function handle_checkpoints()
             end
         end
 
-        handle_checkpoint_respawn()
+        if current_player.biped != no_object then
+            handle_checkpoint_respawn()
+        end
     end
 end
 
@@ -516,21 +615,21 @@ function handle_laps()
 end
 
 for each player do
-    --current_player.set_co_op_spawning(true)
-    --current_player.biped.set_spawn_location_permissions(no_one)
---
-    --handle_checkpoints()
-    --handle_laps()
---
-    --alias lap_time = allocate global.timer
-    --lap_time = current_player.timer[0]
---
-    --script_widget[2].set_text("Lap time %n", lap_time)
---
-    ---- If this player has completed all the laps.
-    --if current_player.number[3] >= script_option[0] then
-    --    game.end_round()
-    --end
+    current_player.set_co_op_spawning(true)
+    current_player.biped.set_spawn_location_permissions(no_one)
+
+    handle_checkpoints()
+    handle_laps()
+
+    alias lap_time = allocate global.timer
+    lap_time = current_player.timer[0]
+
+    script_widget[2].set_text("Lap time %n", lap_time)
+
+    -- If this player has completed all the laps.
+    if current_player.number[3] >= script_option[0] then
+        game.end_round()
+    end
 end
 
 -- Checkpoint System

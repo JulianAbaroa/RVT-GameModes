@@ -23,6 +23,7 @@ function create_initial_spawn_points()
          end
 
          current_object.number[0] = 1 -- This object already created a initial spawn point.
+         temporal_object = no_object
       end
    end
 end
