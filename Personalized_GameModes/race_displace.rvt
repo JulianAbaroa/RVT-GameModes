@@ -63,18 +63,8 @@ function handle_monitors_health()
         teleporter_spawner = current_object.object[0]
 
         if teleporter_spawner.spawn_sequence == 0 then
-            for each player do
-                alias distance = allocate global.number
-                distance = current_player.biped.get_distance_to(current_object)
-
-                if distance <= 200 then
-                    current_object.set_waypoint_text("Now!")
-                    current_object.set_waypoint_priority(blink)
-                altif distance > 200 then
-                    current_object.set_waypoint_text("Destroy!")
-                    current_object.set_waypoint_priority(low)
-                end
-            end
+            current_object.set_waypoint_text("Destroy!")
+            current_object.set_waypoint_priority(low)
         end
     end
 end
@@ -166,7 +156,7 @@ function teleport_players_to_vehicle()
 
     if current_player.number[1] == 1 then -- If this is the first tick since teleportation started.
         current_player.object[2] = no_object
-        current_player.object[2] = current_player.object[1].place_at_me(monitor, none, none, 0, 0, 0, none) -- Create a monitor close to the new vehicle.
+        current_player.object[2] = current_player.object[1].place_at_me(monitor, "trash", none, 0, 0, 10, none) -- Create a monitor close to the new vehicle.
         current_player.object[3] = current_player.biped -- Save the real player's biped.
                 
         current_player.set_biped(current_player.object[2]) -- Set the monitor as the new biped of this player.
@@ -275,7 +265,7 @@ function handle_waypoints()
 end
 
 function handle_vehicle_spawnpoints()
-    for each object with label "vehicle" do
+    for each object with label "vehicle_spawnpoint" do
         if current_object.object[0] == no_object then -- Flag: if this object hasn't spawned any vehicle.
             alias spawned_vehicle = allocate global.object
             
@@ -318,21 +308,13 @@ end
 
 -- Checkpoint System: re-write all this shit based on what race gt does.
 
-declare global.number[0] = 0
-alias empty_fireteam = global.number[0]
-
-declare global.number[1] = 0
-alias candidate = global.number[1]
-
-declare global.number[2] = 0
-alias is_occupied = global.number[2]
-
 on init: do
     for each player do
         current_player.number[2] = -1
+        current_player.set_fireteam(0)
 
         script_widget[1].set_visibility(current_player, false)
-        script_widget[2].set_visibility(current_player, false)
+        --script_widget[2].set_visibility(current_player, false)
     end
 
     for each object with label "checkpoint" do
@@ -401,42 +383,31 @@ function save_player_vehicle()
     end
 end
 
-function get_empty_fireteam()
-    alias player_fireteam = allocate global.number
-
-    if candidate == 0 then
-        candidate = 1
-    end
-
-    is_occupied = 0
-
-    for each player do
-        player_fireteam = current_player.get_fireteam()
-
-        if player_fireteam == candidate then
-            is_occupied = 1
-        end
-    end
-
-    if is_occupied == 0 then
-        empty_fireteam = candidate
-    end
-
-    if is_occupied == 1 then
-        candidate += 1
-
-        if candidate < 8 then
-            get_empty_fireteam()
-        end
-    end
-end
-
 function set_player_fireteam()
     save_players_on_same_vehicle()
 
-    current_player.set_fireteam(empty_fireteam)
-    current_player.player[0].set_fireteam(empty_fireteam)
-    current_player.player[1].set_fireteam(empty_fireteam)
+    alias this_player = allocate global.player
+    this_player = current_player
+
+    alias this_player_fireteam = allocate global.number
+    this_player_fireteam = current_player.get_fireteam()
+
+    if this_player_fireteam == 0 then
+        for each player do
+            if current_player != this_player then
+                alias player_fireteam = allocate global.number
+                player_fireteam = current_player.get_fireteam()
+                
+                if player_fireteam == this_player_fireteam then
+                    this_player_fireteam += 1
+                end
+            end
+        end
+    end
+
+    current_player.set_fireteam(this_player_fireteam)
+    current_player.player[0].set_fireteam(this_player_fireteam)
+    current_player.player[1].set_fireteam(this_player_fireteam)
 
     clear_saved_players()
 end
@@ -453,14 +424,14 @@ function handle_checkpoint_reached()
 
     -- If this is the first checkpoint.
     if current_object.spawn_sequence == 0 then
-        current_player.number[4] = 0 -- Reset this flag.
+        current_player.number[4] = 0 -- Reset this flag.    
 
         -- If this is the first player's lap.
         if current_player.number[3] == 0 then
             send_incident(race_game_start, current_player, no_player)
             current_player.timer[0].set_rate(100%)
             script_widget[1].set_visibility(current_player, true)
-            script_widget[2].set_visibility(current_player, true)
+            --script_widget[2].set_visibility(current_player, true)
 
             save_player_vehicle()
             set_player_fireteam()
@@ -489,7 +460,7 @@ function handle_checkpoint_reached()
         current_player.number[3] += 1 -- Increase this player's lap counter.
 
     altif current_object.spawn_sequence > 0 then
-        send_incident(checkpoint_reached_team, current_player, no_player)
+        send_incident(checkpoint_reached, current_player, no_player)
     end
 
     alias last_checkpoint = allocate global.number -- Maybe it has to be local.
@@ -514,7 +485,7 @@ function handle_checkpoint_respawn()
         current_player.set_primary_respawn_object(current_object)
 
         -- If this player is not being teleportated.
-        if current_player.number[0] == 0  then
+        if current_player.number[0] == 0 then
             current_player.object[2] = no_object
             current_player.object[2] = current_player.get_vehicle()
 
@@ -591,8 +562,11 @@ function handle_checkpoints()
         if current_player.number[2] < current_object.spawn_sequence then
             -- If this is the first checkpoint or the player haven't reached the last checkpoint.
             if current_object.spawn_sequence == 0 or current_player.number[4] == 0 then
-                -- If this checkpoint's shape contains this player.
-                if current_object.shape_contains(current_player.biped) then
+                alias player_vehicle = allocate global.object
+                player_vehicle = current_player.get_vehicle()
+
+                -- If this checkpoint's shape contains this player and this player have a vehicle..
+                if current_object.shape_contains(current_player.biped) and player_vehicle != no_object then
                     handle_checkpoint_reached()
                 end
             end
@@ -624,11 +598,19 @@ for each player do
     alias lap_time = allocate global.timer
     lap_time = current_player.timer[0]
 
-    script_widget[2].set_text("Lap time %n", lap_time)
+    --script_widget[2].set_text("Lap time %n", lap_time)
 
     -- If this player has completed all the laps.
     if current_player.number[3] >= script_option[0] then
         game.end_round()
+    end
+end
+
+for each object with label "trash" do
+    current_object.timer[0].set_rate(100%)
+
+    if current_object.timer[0] > 1 then
+        current_object.delete()
     end
 end
 
