@@ -104,17 +104,23 @@ function save_players_on_same_vehicle()
 end
 
 function create_new_vehicle()
+    for each object with label "vehicle" do
+        if current_object.player[0] == current_player then
+            current_object.player[0] = no_player
+        end
+    end
+
     if previous_vehicle.is_of_type(warthog) then -- If this player is on a warthog.
-        current_player.object[1] = current_player.object[0].place_at_me(warthog, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(warthog, "vehicle", none, 0, 0, 0, none) -- Create another instance of the player's vehicle
 
     altif previous_vehicle.is_of_type(ghost) then -- If this player is on a ghost.
-        current_player.object[1] = current_player.object[0].place_at_me(ghost, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(ghost, "vehicle", none, 0, 0, 0, none) -- Create another instance of the player's vehicle
                 
     altif previous_vehicle.is_of_type(revenant) then -- If this player is on a revenant.
-        current_player.object[1] = current_player.object[0].place_at_me(revenant, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(revenant, "vehicle", none, 0, 0, 0, none) -- Create another instance of the player's vehicle
                 
     altif previous_vehicle.is_of_type(mongoose) then -- If this player is on a mongoose.
-        current_player.object[1] = current_player.object[0].place_at_me(mongoose, none, none, 0, 0, 0, none) -- Create another instance of the player's vehicle
+        current_player.object[1] = current_player.object[0].place_at_me(mongoose, "vehicle", none, 0, 0, 0, none) -- Create another instance of the player's vehicle
     end
 
     current_player.object[0].delete() -- Delete the hill marker saved on this variable.
@@ -156,13 +162,14 @@ function teleport_players_to_vehicle()
 
     if current_player.number[1] == 1 then -- If this is the first tick since teleportation started.
         current_player.object[2] = no_object
-        current_player.object[2] = current_player.object[1].place_at_me(monitor, "trash", none, 0, 0, 10, none) -- Create a monitor close to the new vehicle.
+        current_player.object[2] = current_player.object[1].place_at_me(monitor, "trash", none, 0, 0, 60, none) -- Create a monitor close to the new vehicle.
         current_player.object[3] = current_player.biped -- Save the real player's biped.
                 
         current_player.set_biped(current_player.object[2]) -- Set the monitor as the new biped of this player.
+        current_player.biped.remove_weapon(primary, true)
 
     altif current_player.number[1] == 2 then -- If this is the second tick since teleportation started.
-        current_player.object[3].attach_to(current_player.object[1], 0, 0, 10, relative) -- Move the real player's biped closer to the vehicle.
+        current_player.object[3].attach_to(current_player.object[1], 30, 0, 30, relative) -- Move the real player's biped closer to the vehicle.
         current_player.object[3].detach()
 
         current_player.set_biped(current_player.object[3]) -- Return the player to it's real biped.
@@ -264,35 +271,8 @@ function handle_waypoints()
     end
 end
 
-function handle_vehicle_spawnpoints()
-    for each object with label "vehicle_spawnpoint" do
-        if current_object.object[0] == no_object then -- Flag: if this object hasn't spawned any vehicle.
-            alias spawned_vehicle = allocate global.object
-            
-            if current_object.spawn_sequence == 0 then -- If this has to be a warthog.
-                spawned_vehicle = current_object.place_at_me(warthog, none, none, 0, 0, 0, none)
-            end
-    
-            if current_object.spawn_sequence == 1 then -- If this has to be a revenant.
-                spawned_vehicle = current_object.place_at_me(revenant, none, none, 0, 0, 0, none)
-            end
-    
-            if current_object.spawn_sequence == 2 then -- If this has to be a ghost.
-                spawned_vehicle = current_object.place_at_me(ghost, none, none, 0, 0, 0, none)
-            end
-            
-            if current_object.spawn_sequence == 3 then -- If this has to be a mongoose.
-                spawned_vehicle = current_object.place_at_me(mongoose, none, none, 0, 0, 0, none)
-            end
-
-            current_object.object[0] = spawned_vehicle
-        end
-    end
-end
-
 do
     handle_waypoints()
-    handle_vehicle_spawnpoints()
 end
 
 -- Initialization
@@ -440,7 +420,7 @@ function handle_checkpoint_reached()
         altif current_player.number[3] > 0 then
             alias last_lap = allocate global.number
             last_lap = script_option[0]
-            last_lap -= 1
+            last_lap -= 2
 
             -- If this is not the last lap.
             if current_player.number[3] != last_lap then
@@ -454,6 +434,9 @@ function handle_checkpoint_reached()
                 -- This player is on the final lap.
                 send_incident(final_lap, current_player, all_players)
                 game.show_message_to(current_player, none, "Final lap.")
+            
+            altif current_player.number[3] == script_option[0] then
+                game.end_round()
             end
         end
         
@@ -461,6 +444,7 @@ function handle_checkpoint_reached()
 
     altif current_object.spawn_sequence > 0 then
         send_incident(checkpoint_reached, current_player, no_player)
+        current_player.score += 1
     end
 
     alias last_checkpoint = allocate global.number -- Maybe it has to be local.
@@ -489,27 +473,33 @@ function handle_checkpoint_respawn()
             current_player.object[2] = no_object
             current_player.object[2] = current_player.get_vehicle()
 
+            for each object with label "vehicle" do
+                if current_object.player[0] == current_player then
+                    current_object.player[0] = no_player
+                end
+            end
+
             -- If this player doesn't have a vehicle.
             if current_player.object[2] == no_object then
                 -- If this player had a ghost.
                 if current_player.number[6] == 1 then
-                    current_player.object[2] = current_object.place_at_me(ghost, none, none, 0, 0, 0, none)
+                    current_player.object[2] = current_object.place_at_me(ghost, "vehicle", none, 0, 0, 0, none)
 
                 -- If this player had a mongoose.
                 altif current_player.number[6] == 2 then
-                    current_player.object[2] = current_object.place_at_me(mongoose, none, none, 0, 0, 0, none)
+                    current_player.object[2] = current_object.place_at_me(mongoose, "vehicle", none, 0, 0, 0, none)
                 
                 -- If this player had a revenant.
                 altif current_player.number[6] == 3 then
-                    current_player.object[2] = current_object.place_at_me(revenant, none, none, 0, 0, 0, none)
+                    current_player.object[2] = current_object.place_at_me(revenant, "vehicle", none, 0, 0, 0, none)
                 
                 -- If this player had a warthog.
                 altif current_player.number[6] == 4 then
-                    current_player.object[2] = current_object.place_at_me(warthog, none, none, 0, 0, 0, none)
+                    current_player.object[2] = current_object.place_at_me(warthog, "vehicle", none, 0, 0, 0, none)
                 end
                 
                 current_player.force_into_vehicle(current_player.object[2])
-
+                
                 alias this_player = allocate global.player
                 this_player = current_player
 
@@ -581,11 +571,12 @@ end
 function handle_laps()
     alias last_lap = allocate global.number
     last_lap = script_option[0]
+    last_lap -= 1
 
     alias current_lap = allocate global.number
     current_lap = current_player.number[3]  
 
-    script_widget[1].set_text("Lap %n/%n", current_lap, last_lap)
+    --script_widget[1].set_text("Lap %n/%n", current_lap, last_lap)
 end
 
 for each player do
@@ -611,6 +602,37 @@ for each object with label "trash" do
 
     if current_object.timer[0] > 1 then
         current_object.delete()
+    end
+end
+
+for each object with label "spawn_area" do
+    alias spawn_area = allocate global.object
+    spawn_area = current_object
+
+    for each object with label "vehicle" do  
+        if not spawn_area.shape_contains(current_object) then
+            alias player_vehicle = allocate global.object
+            
+            for each player do
+                player_vehicle = current_player.get_vehicle()
+                
+                if current_object == player_vehicle then
+                    player_vehicle.player[0] = current_player
+                end
+            end
+        
+            if current_object.player[0] == no_player then
+                current_object.timer[0].set_rate(100%)
+            
+            altif current_object.player[0] != no_player then
+                current_object.timer[0].set_rate(0%)
+                current_object.timer[0].reset()
+            end
+        
+            if current_object.timer[0] > 10 then
+                current_object.delete()
+            end
+        end
     end
 end
 
