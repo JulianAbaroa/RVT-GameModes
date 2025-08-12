@@ -1,5 +1,0 @@
-for each player do
-    current_player.biped.remove_weapon(primary, true)    
-    current_player.frag_grenades = 0
-    current_player.plasma_grenades = 0
-end
